@@ -72,6 +72,35 @@
       "emergency_stop": {
         "name": "Emergency Stop"
       }
+    },
+    "number": {
+      "prechill_temp": {
+        "name": "Prechill Temperature"
+      },
+      "ice_target_temp": {
+        "name": "Ice Target Temperature"
+      },
+      "harvest_threshold": {
+        "name": "Harvest Threshold"
+      },
+      "rechill_temp": {
+        "name": "Rechill Temperature"
+      },
+      "bin_full_threshold": {
+        "name": "Bin Full Threshold"
+      },
+      "prechill_timeout": {
+        "name": "Prechill Timeout"
+      },
+      "ice_timeout": {
+        "name": "Ice Timeout"
+      },
+      "harvest_timeout": {
+        "name": "Harvest Timeout"
+      },
+      "rechill_timeout": {
+        "name": "Rechill Timeout"
+      }
     }
   }
 }

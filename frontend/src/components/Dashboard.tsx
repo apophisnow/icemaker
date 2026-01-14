@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { useIcemakerState } from '../hooks/useIcemakerState';
 import { useTemperature } from '../contexts/TemperatureContext';
 import { useDataLogger } from '../contexts/DataLoggerContext';
+import { Configuration } from './Configuration';
 import { Controls } from './Controls';
 import { DataLogger } from './DataLogger';
 import { RelayStatus } from './RelayStatus';
@@ -96,6 +97,10 @@ export function Dashboard() {
 
         <section className="logger-section">
           <DataLogger />
+        </section>
+
+        <section className="config-section">
+          <Configuration />
         </section>
       </div>
     </div>

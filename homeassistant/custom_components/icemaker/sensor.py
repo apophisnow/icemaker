@@ -33,12 +33,14 @@ SENSOR_DESCRIPTIONS: tuple[IcemakerSensorEntityDescription, ...] = (
     IcemakerSensorEntityDescription(
         key="state",
         translation_key="state",
+        name="State",
         icon="mdi:state-machine",
         value_fn=lambda data: data.state,
     ),
     IcemakerSensorEntityDescription(
         key="plate_temperature",
         translation_key="plate_temperature",
+        name="Plate Temperature",
         native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -48,6 +50,7 @@ SENSOR_DESCRIPTIONS: tuple[IcemakerSensorEntityDescription, ...] = (
     IcemakerSensorEntityDescription(
         key="bin_temperature",
         translation_key="bin_temperature",
+        name="Bin Temperature",
         native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
@@ -57,6 +60,7 @@ SENSOR_DESCRIPTIONS: tuple[IcemakerSensorEntityDescription, ...] = (
     IcemakerSensorEntityDescription(
         key="target_temperature",
         translation_key="target_temperature",
+        name="Target Temperature",
         native_unit_of_measurement=UnitOfTemperature.FAHRENHEIT,
         device_class=SensorDeviceClass.TEMPERATURE,
         suggested_display_precision=1,
@@ -65,6 +69,7 @@ SENSOR_DESCRIPTIONS: tuple[IcemakerSensorEntityDescription, ...] = (
     IcemakerSensorEntityDescription(
         key="cycle_count",
         translation_key="cycle_count",
+        name="Cycle Count",
         icon="mdi:counter",
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=lambda data: data.cycle_count,
@@ -72,6 +77,7 @@ SENSOR_DESCRIPTIONS: tuple[IcemakerSensorEntityDescription, ...] = (
     IcemakerSensorEntityDescription(
         key="time_in_state",
         translation_key="time_in_state",
+        name="Time in State",
         native_unit_of_measurement=UnitOfTime.SECONDS,
         device_class=SensorDeviceClass.DURATION,
         suggested_display_precision=0,

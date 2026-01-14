@@ -18,6 +18,23 @@ _LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
+class IcemakerConfig:
+    """Data class for icemaker configuration."""
+
+    prechill_temp: float
+    prechill_timeout: int
+    ice_target_temp: float
+    ice_timeout: int
+    harvest_threshold: float
+    harvest_timeout: int
+    rechill_temp: float
+    rechill_timeout: int
+    bin_full_threshold: float
+    poll_interval: float
+    use_simulator: bool
+
+
+@dataclass
 class IcemakerData:
     """Data class for icemaker state."""
 
@@ -30,6 +47,7 @@ class IcemakerData:
     time_in_state_seconds: float
     chill_mode: str | None
     relays: dict[str, bool]
+    config: IcemakerConfig | None = None
 
 
 class IcemakerApiClient:
@@ -52,12 +70,30 @@ class IcemakerApiClient:
         """Get current relay states."""
         async with self._session.get(f"{self._base_url}/api/relays/") as response:
             response.raise_for_status()
+            data = await response.json()
+            # API returns {"relays": {...}}
+            return data.get("relays", {})
+
+    async def get_config(self) -> dict[str, Any]:
+        """Get current configuration."""
+        async with self._session.get(f"{self._base_url}/api/config/") as response:
+            response.raise_for_status()
+            return await response.json()
+
+    async def update_config(self, **kwargs: Any) -> dict[str, Any]:
+        """Update configuration parameters."""
+        async with self._session.put(
+            f"{self._base_url}/api/config/",
+            json=kwargs,
+        ) as response:
+            response.raise_for_status()
             return await response.json()
 
     async def start_cycle(self) -> bool:
         """Start an ice-making cycle."""
         async with self._session.post(
-            f"{self._base_url}/api/state/start"
+            f"{self._base_url}/api/state/cycle",
+            json={"action": "start"},
         ) as response:
             response.raise_for_status()
             data = await response.json()
@@ -66,17 +102,26 @@ class IcemakerApiClient:
     async def emergency_stop(self) -> bool:
         """Trigger emergency stop."""
         async with self._session.post(
-            f"{self._base_url}/api/state/emergency-stop"
+            f"{self._base_url}/api/state/cycle",
+            json={"action": "emergency_stop"},
         ) as response:
             response.raise_for_status()
             data = await response.json()
             return data.get("success", False)
 
-    async def set_relay(self, relay: str, state: bool) -> bool:
+    async def set_relay(self, relay: str, on: bool) -> bool:
         """Set a relay state."""
         async with self._session.post(
-            f"{self._base_url}/api/relays/{relay}",
-            json={"state": state},
+            f"{self._base_url}/api/relays/",
+            json={"relay": relay, "on": on},
+        ) as response:
+            response.raise_for_status()
+            return True
+
+    async def all_relays_off(self) -> bool:
+        """Turn off all relays."""
+        async with self._session.post(
+            f"{self._base_url}/api/relays/all-off",
         ) as response:
             response.raise_for_status()
             return True
@@ -113,9 +158,24 @@ class IcemakerCoordinator(DataUpdateCoordinator[IcemakerData]):
         """Fetch data from the icemaker."""
         try:
             async with asyncio.timeout(10):
-                state_data, relay_data = await asyncio.gather(
+                state_data, relay_data, config_data = await asyncio.gather(
                     self.client.get_state(),
                     self.client.get_relays(),
+                    self.client.get_config(),
+                )
+
+                config = IcemakerConfig(
+                    prechill_temp=config_data.get("prechill_temp", 32.0),
+                    prechill_timeout=config_data.get("prechill_timeout", 120),
+                    ice_target_temp=config_data.get("ice_target_temp", -2.0),
+                    ice_timeout=config_data.get("ice_timeout", 1500),
+                    harvest_threshold=config_data.get("harvest_threshold", 38.0),
+                    harvest_timeout=config_data.get("harvest_timeout", 240),
+                    rechill_temp=config_data.get("rechill_temp", 35.0),
+                    rechill_timeout=config_data.get("rechill_timeout", 300),
+                    bin_full_threshold=config_data.get("bin_full_threshold", 35.0),
+                    poll_interval=config_data.get("poll_interval", 5.0),
+                    use_simulator=config_data.get("use_simulator", False),
                 )
 
                 return IcemakerData(
@@ -128,6 +188,7 @@ class IcemakerCoordinator(DataUpdateCoordinator[IcemakerData]):
                     time_in_state_seconds=state_data.get("time_in_state_seconds", 0.0),
                     chill_mode=state_data.get("chill_mode"),
                     relays=relay_data,
+                    config=config,
                 )
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Error communicating with icemaker: {err}") from err
