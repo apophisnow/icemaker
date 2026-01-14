@@ -24,17 +24,10 @@ class IcemakerButtonEntityDescription(ButtonEntityDescription):
 
 BUTTON_DESCRIPTIONS: tuple[IcemakerButtonEntityDescription, ...] = (
     IcemakerButtonEntityDescription(
-        key="start_cycle",
-        translation_key="start_cycle",
-        name="Start Cycle",
-        icon="mdi:play-circle",
-        press_fn=lambda client: client.start_cycle(),
-    ),
-    IcemakerButtonEntityDescription(
         key="emergency_stop",
         translation_key="emergency_stop",
         name="Emergency Stop",
-        icon="mdi:stop-circle",
+        icon="mdi:alert-octagon",
         press_fn=lambda client: client.emergency_stop(),
     ),
 )

@@ -99,6 +99,16 @@ class IcemakerApiClient:
             data = await response.json()
             return data.get("success", False)
 
+    async def stop_cycle(self) -> bool:
+        """Stop the current ice-making cycle."""
+        async with self._session.post(
+            f"{self._base_url}/api/state/cycle",
+            json={"action": "stop"},
+        ) as response:
+            response.raise_for_status()
+            data = await response.json()
+            return data.get("success", False)
+
     async def emergency_stop(self) -> bool:
         """Trigger emergency stop."""
         async with self._session.post(

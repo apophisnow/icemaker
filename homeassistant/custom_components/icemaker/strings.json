@@ -66,11 +66,13 @@
       }
     },
     "button": {
-      "start_cycle": {
-        "name": "Start Cycle"
-      },
       "emergency_stop": {
         "name": "Emergency Stop"
+      }
+    },
+    "switch": {
+      "cycle": {
+        "name": "Cycle"
       }
     },
     "number": {
