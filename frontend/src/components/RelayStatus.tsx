@@ -11,7 +11,7 @@ interface RelayStatusProps {
 const RELAY_DISPLAY_NAMES: Record<keyof RelayStates, string> = {
   water_valve: 'Water Valve',
   hot_gas_solenoid: 'Hot Gas',
-  recirculating_pump: 'Recirc Pump',
+  recirculating_pump: 'Recirculating Pump',
   compressor_1: 'Compressor 1',
   compressor_2: 'Compressor 2',
   condenser_fan: 'Condenser Fan',
