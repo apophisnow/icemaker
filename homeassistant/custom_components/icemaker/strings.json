@@ -1,0 +1,77 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Icemaker",
+        "description": "Enter the connection details for your icemaker.",
+        "data": {
+          "host": "Host",
+          "port": "Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Failed to connect to the icemaker. Please check the host and port.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This icemaker is already configured."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "state": {
+        "name": "State"
+      },
+      "plate_temperature": {
+        "name": "Plate Temperature"
+      },
+      "bin_temperature": {
+        "name": "Bin Temperature"
+      },
+      "target_temperature": {
+        "name": "Target Temperature"
+      },
+      "cycle_count": {
+        "name": "Cycle Count"
+      },
+      "time_in_state": {
+        "name": "Time in State"
+      }
+    },
+    "binary_sensor": {
+      "water_valve": {
+        "name": "Water Valve"
+      },
+      "hot_gas_solenoid": {
+        "name": "Hot Gas Solenoid"
+      },
+      "recirculating_pump": {
+        "name": "Recirculating Pump"
+      },
+      "compressor_1": {
+        "name": "Compressor 1"
+      },
+      "compressor_2": {
+        "name": "Compressor 2"
+      },
+      "condenser_fan": {
+        "name": "Condenser Fan"
+      },
+      "led": {
+        "name": "LED"
+      },
+      "ice_cutter": {
+        "name": "Ice Cutter"
+      }
+    },
+    "button": {
+      "start_cycle": {
+        "name": "Start Cycle"
+      },
+      "emergency_stop": {
+        "name": "Emergency Stop"
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "domain": "icemaker",
+  "name": "Icemaker Control",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/your-repo/icemaker",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/your-repo/icemaker/issues",
+  "requirements": ["aiohttp>=3.8.0"],
+  "version": "1.0.0"
+}
