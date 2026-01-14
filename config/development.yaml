@@ -1,0 +1,26 @@
+# Development Configuration
+# Shorter timeouts and simulator enabled for faster iteration
+
+log_level: DEBUG
+poll_interval: 1.0
+
+states:
+  prechill:
+    target_temp: 32.0
+    timeout_seconds: 30  # Shortened for dev
+
+  ice_making:
+    target_temp: -2.0
+    timeout_seconds: 60  # Shortened for dev
+
+  harvest:
+    target_temp: 38.0
+    timeout_seconds: 30  # Shortened for dev
+
+  rechill:
+    target_temp: 35.0
+    timeout_seconds: 30  # Shortened for dev
+
+simulation:
+  enabled: true
+  speed: 10.0  # 10x faster simulation

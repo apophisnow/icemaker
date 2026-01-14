@@ -1,0 +1,14 @@
+.claude/
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+dist/
+build/
+*.log
+coverage/
+.pytest_cache/

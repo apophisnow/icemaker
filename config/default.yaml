@@ -1,0 +1,37 @@
+# Icemaker Default Configuration
+# All temperatures in Fahrenheit, timeouts in seconds
+
+log_level: INFO
+poll_interval: 5.0
+
+states:
+  prechill:
+    target_temp: 32.0
+    timeout_seconds: 120  # 2 minutes
+
+  ice_making:
+    target_temp: -2.0
+    timeout_seconds: 1500  # 25 minutes
+
+  harvest:
+    target_temp: 38.0
+    timeout_seconds: 240  # 4 minutes
+
+  rechill:
+    target_temp: 35.0
+    timeout_seconds: 300  # 5 minutes
+
+thresholds:
+  bin_full: 35.0
+
+hardware:
+  plate_sensor_id: "092101487373"
+  bin_sensor_id: "3c01f0956abd"
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+
+simulation:
+  enabled: false
+  speed: 1.0
