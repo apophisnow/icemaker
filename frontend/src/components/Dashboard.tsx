@@ -2,9 +2,12 @@
  * Main dashboard component.
  */
 
+import { useEffect } from 'react';
 import { useIcemakerState } from '../hooks/useIcemakerState';
 import { useTemperature } from '../contexts/TemperatureContext';
+import { useDataLogger } from '../contexts/DataLoggerContext';
 import { Controls } from './Controls';
+import { DataLogger } from './DataLogger';
 import { RelayStatus } from './RelayStatus';
 import { StateDisplay } from './StateDisplay';
 import { TemperatureChart } from './TemperatureChart';
@@ -21,6 +24,14 @@ export function Dashboard() {
     refresh,
   } = useIcemakerState();
   const { unit, toggleUnit } = useTemperature();
+  const { logData, isLogging } = useDataLogger();
+
+  // Log data when status updates and logging is active
+  useEffect(() => {
+    if (isLogging && status) {
+      logData(status, relays);
+    }
+  }, [isLogging, status, relays, logData]);
 
   if (isLoading) {
     return (
@@ -81,6 +92,10 @@ export function Dashboard() {
             onError={() => clearError()}
             onRefresh={refresh}
           />
+        </section>
+
+        <section className="logger-section">
+          <DataLogger />
         </section>
       </div>
     </div>
