@@ -80,7 +80,7 @@ async def control_cycle(command: CycleCommand) -> dict:
     """Control ice-making cycle.
 
     Args:
-        command: Cycle control command (start, stop, emergency_stop).
+        command: Cycle control command (power_on, power_off, start, stop, emergency_stop).
 
     Returns:
         Result of command.
@@ -89,16 +89,28 @@ async def control_cycle(command: CycleCommand) -> dict:
     if state.controller is None:
         raise HTTPException(503, "Controller not initialized")
 
-    if command.action == "start":
+    if command.action == "power_on":
+        success = await state.controller.power_on()
+        if not success:
+            raise HTTPException(400, "Cannot power on - not in OFF state")
+        return {"success": True, "message": "Power on initiated"}
+
+    elif command.action == "power_off":
+        success = await state.controller.power_off()
+        if not success:
+            raise HTTPException(400, "Cannot power off - not in IDLE or ERROR state")
+        return {"success": True, "message": "Powered off"}
+
+    elif command.action == "start":
         success = await state.controller.start_cycle()
         if not success:
             raise HTTPException(400, "Cannot start cycle - not in IDLE state")
         return {"success": True, "message": "Cycle started"}
 
     elif command.action == "stop":
-        await state.controller.fsm.transition_to(
-            state.controller.fsm.state.__class__.IDLE
-        )
+        success = await state.controller.stop_cycle()
+        if not success:
+            raise HTTPException(400, "Cannot stop cycle - not in an active cycle state")
         return {"success": True, "message": "Cycle stopped"}
 
     elif command.action == "emergency_stop":

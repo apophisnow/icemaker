@@ -13,7 +13,7 @@ from ..config import load_config
 from ..core.controller import IcemakerController
 from ..core.events import Event, EventType, temp_reading_event
 from ..hal.base import SensorName
-from .routes import config, relays, sensors, state
+from .routes import config, relays, sensors, simulator, state
 from .websocket import WebSocketManager
 
 logger = logging.getLogger(__name__)
@@ -34,13 +34,43 @@ class AppState:
 app_state = AppState()
 
 
+def _get_target_temp_for_state(state: str) -> float | None:
+    """Get target temp for a state based on config."""
+    controller = app_state.controller
+    if controller is None:
+        return None
+    cfg = controller.config
+    ctx = controller.fsm.context
+
+    target = None
+    if state == "CHILL":
+        if ctx.chill_mode == "rechill":
+            target = cfg.rechill.target_temp
+        else:
+            target = cfg.prechill.target_temp
+    elif state == "ICE":
+        target = cfg.ice_making.target_temp
+    elif state == "HEAT":
+        target = cfg.harvest.target_temp
+
+    logger.debug("_get_target_temp_for_state(%s) -> %s (harvest=%s)", state, target, cfg.harvest.target_temp)
+    return target
+
+
 async def _event_handler(event: Event) -> None:
     """Handle FSM events and broadcast to WebSocket clients."""
     if event.type == EventType.STATE_ENTER:
         fsm = app_state.controller.fsm
         ctx = fsm.context
+        state_name = event.data.get("state", "")
+
+        # Get correct target temp for the new state
+        target_temp = _get_target_temp_for_state(state_name)
+        if target_temp is not None:
+            ctx.target_temp = target_temp
+
         await app_state.ws_manager.broadcast_state_update(
-            state=event.data.get("state", ""),
+            state=state_name,
             previous_state=event.data.get("from_state"),
             plate_temp=ctx.plate_temp,
             bin_temp=ctx.bin_temp,
@@ -84,12 +114,21 @@ async def _poll_sensors_loop() -> None:
             controller.fsm.context.plate_temp = temps.get(SensorName.PLATE, 70.0)
             controller.fsm.context.bin_temp = temps.get(SensorName.ICE_BIN, 70.0)
 
-            # Emit temperature reading event
-            for listener in controller._event_listeners:
-                await listener(temp_reading_event(
-                    controller.fsm.context.plate_temp,
-                    controller.fsm.context.bin_temp,
-                ))
+            # Get water temperature and ice thickness from thermal model if available
+            water_temp = None
+            ice_thickness = None
+            if controller._thermal_model is not None:
+                water_temp = controller._thermal_model.get_water_temp()
+                ice_thickness = controller._thermal_model.get_ice_thickness()
+
+            # Broadcast temperature update via WebSocket
+            await app_state.ws_manager.broadcast_temp_update(
+                controller.fsm.context.plate_temp,
+                controller.fsm.context.bin_temp,
+                water_temp,
+                ice_thickness,
+                controller.fsm.context.target_temp,
+            )
 
         except asyncio.CancelledError:
             break
@@ -224,6 +263,7 @@ def create_app() -> FastAPI:
     app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
     app.include_router(relays.router, prefix="/api/relays", tags=["Relays"])
     app.include_router(sensors.router, prefix="/api/sensors", tags=["Sensors"])
+    app.include_router(simulator.router, prefix="/api/simulator", tags=["Simulator"])
 
     @app.get("/health")
     async def health_check():

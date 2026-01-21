@@ -65,6 +65,8 @@ export function useIcemakerState() {
         const tempReading: TemperatureReading = {
           plate_temp_f: data.plate_temp_f,
           bin_temp_f: data.bin_temp_f,
+          water_temp_f: data.water_temp_f,
+          ice_thickness_mm: data.ice_thickness_mm,
           timestamp: message.timestamp,
         };
         setState((prev) => ({
@@ -78,6 +80,9 @@ export function useIcemakerState() {
                 ...prev.status,
                 plate_temp: data.plate_temp_f,
                 bin_temp: data.bin_temp_f,
+                water_temp: data.water_temp_f,
+                ice_thickness_mm: data.ice_thickness_mm,
+                target_temp: data.target_temp ?? prev.status.target_temp,
               }
             : null,
         }));

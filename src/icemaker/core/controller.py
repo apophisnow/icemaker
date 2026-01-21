@@ -30,12 +30,14 @@ class IcemakerController:
     that control relay states based on temperature readings.
 
     The controller implements the ice-making cycle:
-    1. POWER_ON: Prime water system
-    2. CHILL (prechill): Cool plate to 32°F
-    3. ICE: Make ice at -2°F with recirculation
-    4. HEAT: Harvest ice at 38°F
-    5. CHILL (rechill): Cool to 35°F
-    6. Check bin, repeat or idle
+    0. OFF: System powered off
+    1. POWER_ON: Prime water system (runs on power_on())
+    2. IDLE: Ready state, waiting for user to start cycle
+    3. CHILL (prechill): Cool plate to 32°F
+    4. ICE: Make ice at -2°F with recirculation
+    5. HEAT: Harvest ice at 38°F
+    6. CHILL (rechill): Cool to 35°F
+    7. Check bin, repeat or return to IDLE
     """
 
     def __init__(
@@ -59,7 +61,7 @@ class IcemakerController:
         self._sensors = sensors
         self._thermal_model = thermal_model
         self._fsm = AsyncFSM(
-            initial_state=IcemakerState.IDLE,
+            initial_state=IcemakerState.OFF,
             poll_interval=self.config.poll_interval,
         )
         self._running = False
@@ -99,6 +101,8 @@ class IcemakerController:
                 self._gpio = gpio
                 self._sensors = sensors
                 self._thermal_model = model
+                # Apply speed multiplier from config
+                self._thermal_model.set_speed_multiplier(self.config.simulator_speed)
             else:
                 self._gpio, self._sensors = create_hal()
 
@@ -107,6 +111,7 @@ class IcemakerController:
         await self._sensors.setup(DEFAULT_SENSOR_IDS)
 
         # Register state handlers
+        self._fsm.register_handler(IcemakerState.OFF, self._handle_off)
         self._fsm.register_handler(IcemakerState.IDLE, self._handle_idle)
         self._fsm.register_handler(IcemakerState.POWER_ON, self._handle_power_on)
         self._fsm.register_handler(IcemakerState.CHILL, self._handle_chill)
@@ -163,6 +168,30 @@ class IcemakerController:
 
         logger.info("Controller stopped")
 
+    async def power_on(self) -> bool:
+        """Power on the icemaker from OFF state.
+
+        Runs the POWER_ON sequence (water priming) then transitions to IDLE.
+
+        Returns:
+            True if power on started, False if not in OFF state.
+        """
+        if self._fsm.state != IcemakerState.OFF:
+            return False
+        return await self._fsm.transition_to(IcemakerState.POWER_ON)
+
+    async def power_off(self) -> bool:
+        """Power off the icemaker to OFF state.
+
+        Can be called from IDLE or ERROR states.
+
+        Returns:
+            True if powered off, False if not in a valid state.
+        """
+        if self._fsm.state not in {IcemakerState.IDLE, IcemakerState.ERROR}:
+            return False
+        return await self._fsm.transition_to(IcemakerState.OFF)
+
     async def start_cycle(self) -> bool:
         """Start an ice-making cycle from IDLE state.
 
@@ -171,13 +200,32 @@ class IcemakerController:
         """
         if self._fsm.state != IcemakerState.IDLE:
             return False
+        self._fsm.context.chill_mode = "prechill"
         return await self._fsm.transition_to(IcemakerState.CHILL)
 
+    async def stop_cycle(self) -> bool:
+        """Stop the current ice-making cycle and return to IDLE.
+
+        Can be called from CHILL, ICE, or HEAT states.
+        Use start_cycle() to begin a new cycle from IDLE.
+
+        Returns:
+            True if stopped, False if not in an active cycle state.
+        """
+        active_states = {
+            IcemakerState.CHILL,
+            IcemakerState.ICE,
+            IcemakerState.HEAT,
+        }
+        if self._fsm.state not in active_states:
+            return False
+        return await self._fsm.transition_to(IcemakerState.IDLE)
+
     async def emergency_stop(self) -> None:
-        """Emergency stop - turn off all relays and go to IDLE."""
+        """Emergency stop - turn off all relays and go to OFF."""
         await self._all_relays_off()
-        # Force transition to IDLE
-        self._fsm._state = IcemakerState.IDLE
+        # Force transition to OFF
+        self._fsm._state = IcemakerState.OFF
         await self._fsm._emit_event(Event(
             type=EventType.EMERGENCY_STOP,
             source="controller",
@@ -250,17 +298,26 @@ class IcemakerController:
     # State handlers
     # -------------------------------------------------------------------------
 
+    async def _handle_off(
+        self,
+        fsm: AsyncFSM,
+        ctx: FSMContext,
+    ) -> Optional[IcemakerState]:
+        """Handle OFF state - system powered off."""
+        # Ensure all relays are off
+        await self._all_relays_off()
+        # Wait for explicit power_on() call
+        return None
+
     async def _handle_idle(
         self,
         fsm: AsyncFSM,
         ctx: FSMContext,
     ) -> Optional[IcemakerState]:
-        """Handle IDLE state - wait for start command or bin to empty."""
-        # Ensure all relays are off
+        """Handle IDLE state - powered on, ready to make ice."""
+        # Ensure all relays are off while idle
         await self._all_relays_off()
-
-        # If bin is no longer full, we could auto-start (optional)
-        # For now, just wait for explicit start_cycle() call
+        # Wait for explicit start_cycle() call
         return None
 
     async def _handle_power_on(
@@ -295,9 +352,9 @@ class IcemakerController:
             await self._set_relay(RelayName.WATER_VALVE, True)
             return None
 
-        # Done - transition to CHILL
+        # Done - transition to IDLE (ready for user to start cycle)
         await self._set_relay(RelayName.WATER_VALVE, False)
-        return IcemakerState.CHILL
+        return IcemakerState.IDLE
 
     async def _handle_chill(
         self,
@@ -337,9 +394,11 @@ class IcemakerController:
                     logger.info("Bin full, entering IDLE")
                     return IcemakerState.IDLE
                 else:
-                    # Start next cycle
+                    # Start next cycle - transition to ICE state which will
+                    # go through HEAT and back to CHILL with proper timing reset
                     ctx.chill_mode = "prechill"
-                    return None  # Stay in CHILL for prechill
+                    ctx.cycle_start_time = datetime.now()
+                    return IcemakerState.ICE
 
         if elapsed > timeout:
             logger.warning(
@@ -356,8 +415,10 @@ class IcemakerController:
                 ctx.cycle_count += 1
                 if self._is_bin_full():
                     return IcemakerState.IDLE
+                # Start next cycle - transition to ICE state
                 ctx.chill_mode = "prechill"
-                return None
+                ctx.cycle_start_time = datetime.now()
+                return IcemakerState.ICE
 
         # Keep cooling
         await self._set_cooling_relays(with_recirculation=False)
@@ -460,4 +521,4 @@ class IcemakerController:
     ) -> Optional[IcemakerState]:
         """Handle SHUTDOWN state - graceful shutdown."""
         await self._all_relays_off()
-        return IcemakerState.IDLE
+        return IcemakerState.OFF

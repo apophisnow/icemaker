@@ -126,17 +126,30 @@ class WebSocketManager:
         self,
         plate_temp: float,
         bin_temp: float,
+        water_temp: float | None = None,
+        ice_thickness_mm: float | None = None,
+        target_temp: float | None = None,
     ) -> None:
         """Broadcast temperature update to all clients.
 
         Args:
             plate_temp: Current plate temperature in Fahrenheit.
             bin_temp: Current bin temperature in Fahrenheit.
+            water_temp: Current water reservoir temperature in Fahrenheit (simulator only).
+            ice_thickness_mm: Current ice thickness in mm (simulator only).
+            target_temp: Current target temperature for the state.
         """
-        await self.broadcast("temp_update", {
+        data = {
             "plate_temp_f": plate_temp,
             "bin_temp_f": bin_temp,
-        })
+        }
+        if water_temp is not None:
+            data["water_temp_f"] = water_temp
+        if ice_thickness_mm is not None:
+            data["ice_thickness_mm"] = ice_thickness_mm
+        if target_temp is not None:
+            data["target_temp"] = target_temp
+        await self.broadcast("temp_update", data)
 
     async def broadcast_relay_update(
         self,

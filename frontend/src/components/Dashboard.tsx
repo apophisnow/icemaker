@@ -93,6 +93,7 @@ export function Dashboard() {
             relays={relays}
             plateTemp={status?.plate_temp ?? null}
             binTemp={status?.bin_temp ?? null}
+            waterTemp={status?.water_temp ?? null}
             state={status?.state ?? null}
           />
         </section>

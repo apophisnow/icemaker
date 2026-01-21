@@ -3,7 +3,7 @@
  */
 
 import { useState } from 'react';
-import { emergencyStop, startCycle, stopCycle } from '../api/client';
+import { emergencyStop, powerOff, powerOn, startCycle, stopCycle } from '../api/client';
 import type { IcemakerState } from '../types/icemaker';
 
 interface ControlsProps {
@@ -14,6 +14,30 @@ interface ControlsProps {
 
 export function Controls({ currentState, onError, onRefresh }: ControlsProps) {
   const [isLoading, setIsLoading] = useState(false);
+
+  const handlePowerOn = async () => {
+    setIsLoading(true);
+    try {
+      await powerOn();
+      onRefresh();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Failed to power on');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePowerOff = async () => {
+    setIsLoading(true);
+    try {
+      await powerOff();
+      onRefresh();
+    } catch (e) {
+      onError(e instanceof Error ? e.message : 'Failed to power off');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleStartCycle = async () => {
     setIsLoading(true);
@@ -51,28 +75,58 @@ export function Controls({ currentState, onError, onRefresh }: ControlsProps) {
     }
   };
 
-  const canStart = currentState === 'IDLE';
-  const canStop = currentState && !['IDLE', 'ERROR', 'SHUTDOWN'].includes(currentState);
+  const isOff = currentState === 'OFF';
+  const isIdle = currentState === 'IDLE';
+  const isPoweringOn = currentState === 'POWER_ON';
+  const isInCycle = currentState && ['CHILL', 'ICE', 'HEAT'].includes(currentState);
+  const isError = currentState === 'ERROR';
+
+  const canPowerOn = isOff;
+  const canPowerOff = isIdle || isError;
+  const canStart = isIdle;
+  const canStop = isInCycle;
 
   return (
     <div className="controls">
       <h3>Controls</h3>
       <div className="control-buttons">
-        <button
-          className="btn btn-primary"
-          onClick={handleStartCycle}
-          disabled={!canStart || isLoading}
-        >
-          {isLoading ? 'Starting...' : 'Start Cycle'}
-        </button>
+        {/* Power On/Off toggle */}
+        {isOff ? (
+          <button
+            className="btn btn-success"
+            onClick={handlePowerOn}
+            disabled={!canPowerOn || isLoading}
+          >
+            {isLoading ? 'Powering On...' : 'Power On'}
+          </button>
+        ) : (
+          <button
+            className="btn btn-secondary"
+            onClick={handlePowerOff}
+            disabled={!canPowerOff || isLoading}
+          >
+            Power Off
+          </button>
+        )}
 
-        <button
-          className="btn btn-secondary"
-          onClick={handleStopCycle}
-          disabled={!canStop || isLoading}
-        >
-          Stop Cycle
-        </button>
+        {/* Start/Stop cycle toggle */}
+        {isInCycle ? (
+          <button
+            className="btn btn-warning"
+            onClick={handleStopCycle}
+            disabled={!canStop || isLoading}
+          >
+            Stop Cycle
+          </button>
+        ) : (
+          <button
+            className="btn btn-primary"
+            onClick={handleStartCycle}
+            disabled={!canStart || isLoading}
+          >
+            {isLoading ? 'Starting...' : 'Start Cycle'}
+          </button>
+        )}
 
         <button
           className="btn btn-danger"
@@ -85,9 +139,11 @@ export function Controls({ currentState, onError, onRefresh }: ControlsProps) {
 
       <div className="control-info">
         <p>
-          {canStart && 'Ready to start a new ice-making cycle.'}
-          {canStop && 'Cycle in progress. Stop to return to IDLE.'}
-          {currentState === 'ERROR' && 'Error state. Use emergency stop to reset.'}
+          {isOff && 'System is off. Press Power On to initialize.'}
+          {isPoweringOn && 'Powering on... Water system priming in progress.'}
+          {isIdle && 'Ready. Press Start Cycle to begin making ice.'}
+          {isInCycle && 'Cycle in progress. Press Stop to return to idle.'}
+          {isError && 'Error state. Use Emergency Stop to reset.'}
         </p>
       </div>
     </div>

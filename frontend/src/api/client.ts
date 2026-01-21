@@ -40,6 +40,20 @@ export async function fetchConfig(): Promise<IcemakerConfig> {
   return fetchJson<IcemakerConfig>(`${API_BASE}/config/`);
 }
 
+export async function powerOn(): Promise<{ success: boolean; message: string }> {
+  return fetchJson(`${API_BASE}/state/cycle`, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'power_on' }),
+  });
+}
+
+export async function powerOff(): Promise<{ success: boolean; message: string }> {
+  return fetchJson(`${API_BASE}/state/cycle`, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'power_off' }),
+  });
+}
+
 export async function startCycle(): Promise<{ success: boolean; message: string }> {
   return fetchJson(`${API_BASE}/state/cycle`, {
     method: 'POST',
@@ -93,5 +107,39 @@ export async function transitionState(
   return fetchJson(`${API_BASE}/state/transition`, {
     method: 'POST',
     body: JSON.stringify({ target_state: targetState, force }),
+  });
+}
+
+// Simulator API
+
+export interface SimulatorStatus {
+  enabled: boolean;
+  speed_multiplier: number;
+  water_temp_f: number;
+  plate_temp_f: number;
+  bin_temp_f: number;
+}
+
+export async function fetchSimulatorStatus(): Promise<SimulatorStatus> {
+  return fetchJson<SimulatorStatus>(`${API_BASE}/simulator/`);
+}
+
+export async function setSimulatorSpeed(
+  multiplier: number
+): Promise<{ speed_multiplier: number; message: string }> {
+  return fetchJson(`${API_BASE}/simulator/speed`, {
+    method: 'POST',
+    body: JSON.stringify({ multiplier }),
+  });
+}
+
+export async function resetSimulator(): Promise<{
+  message: string;
+  plate_temp_f: number;
+  bin_temp_f: number;
+  water_temp_f: number;
+}> {
+  return fetchJson(`${API_BASE}/simulator/reset`, {
+    method: 'POST',
   });
 }

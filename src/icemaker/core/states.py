@@ -9,12 +9,16 @@ class IcemakerState(Enum):
     """Icemaker operational states.
 
     States follow the ice-making cycle:
-    IDLE -> POWER_ON -> CHILL (prechill) -> ICE -> HEAT -> CHILL (rechill) -> ...
+    OFF -> POWER_ON -> IDLE -> CHILL (prechill) -> ICE -> HEAT -> CHILL (rechill) -> ...
 
-    The cycle repeats until the bin is full, at which point the system
-    enters IDLE state until the bin has room for more ice.
+    The cycle repeats until the bin is full, then returns to IDLE.
+
+    OFF: System powered off, initial state on startup.
+    POWER_ON: Water priming sequence after power on.
+    IDLE: Powered on and ready, waiting for user to start ice making.
     """
 
+    OFF = auto()
     IDLE = auto()
     POWER_ON = auto()
     CHILL = auto()
@@ -52,12 +56,20 @@ class StateConfig:
 
 # State transition table defining valid transitions and state configurations
 TRANSITIONS: dict[IcemakerState, StateConfig] = {
-    IcemakerState.IDLE: StateConfig(
+    IcemakerState.OFF: StateConfig(
         target_temp=None,
         timeout_seconds=float("inf"),
         allowed_transitions=frozenset({
             IcemakerState.POWER_ON,
-            IcemakerState.CHILL,
+            IcemakerState.SHUTDOWN,
+        }),
+    ),
+    IcemakerState.IDLE: StateConfig(
+        target_temp=None,
+        timeout_seconds=float("inf"),
+        allowed_transitions=frozenset({
+            IcemakerState.CHILL,  # Resume always starts from prechill
+            IcemakerState.OFF,
             IcemakerState.SHUTDOWN,
         }),
     ),
@@ -66,6 +78,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         timeout_seconds=120,  # 2 minutes for startup sequence
         allowed_transitions=frozenset({
             IcemakerState.CHILL,
+            IcemakerState.IDLE,
             IcemakerState.ERROR,
             IcemakerState.SHUTDOWN,
         }),
@@ -75,7 +88,8 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         timeout_seconds=300,  # 5 minutes default
         allowed_transitions=frozenset({
             IcemakerState.ICE,
-            IcemakerState.IDLE,
+            IcemakerState.IDLE,  # Pause
+            IcemakerState.OFF,
             IcemakerState.ERROR,
             IcemakerState.SHUTDOWN,
         }),
@@ -85,6 +99,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         timeout_seconds=1500,  # 25 minutes
         allowed_transitions=frozenset({
             IcemakerState.HEAT,
+            IcemakerState.IDLE,  # Pause
             IcemakerState.ERROR,
             IcemakerState.SHUTDOWN,
         }),
@@ -94,6 +109,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         timeout_seconds=240,  # 4 minutes
         allowed_transitions=frozenset({
             IcemakerState.CHILL,
+            IcemakerState.IDLE,  # Pause
             IcemakerState.ERROR,
             IcemakerState.SHUTDOWN,
         }),
@@ -102,7 +118,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         target_temp=None,
         timeout_seconds=float("inf"),
         allowed_transitions=frozenset({
-            IcemakerState.IDLE,
+            IcemakerState.OFF,
             IcemakerState.SHUTDOWN,
         }),
     ),
@@ -110,7 +126,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         target_temp=None,
         timeout_seconds=30,
         allowed_transitions=frozenset({
-            IcemakerState.IDLE,
+            IcemakerState.OFF,
         }),
     ),
 }

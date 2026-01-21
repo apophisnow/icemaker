@@ -52,15 +52,15 @@ class AsyncFSM:
     interval.
 
     Example:
-        fsm = AsyncFSM(initial_state=IcemakerState.IDLE)
-        fsm.register_handler(IcemakerState.IDLE, idle_handler)
+        fsm = AsyncFSM(initial_state=IcemakerState.OFF)
+        fsm.register_handler(IcemakerState.OFF, off_handler)
         fsm.register_handler(IcemakerState.CHILL, chill_handler)
         await fsm.run()
     """
 
     def __init__(
         self,
-        initial_state: IcemakerState = IcemakerState.IDLE,
+        initial_state: IcemakerState = IcemakerState.OFF,
         poll_interval: float = 5.0,
     ) -> None:
         """Initialize the FSM.

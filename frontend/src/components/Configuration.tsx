@@ -3,7 +3,14 @@
  */
 
 import { useEffect, useState } from 'react';
-import { fetchConfig, updateConfig } from '../api/client';
+import {
+  fetchConfig,
+  fetchSimulatorStatus,
+  resetSimulator,
+  setSimulatorSpeed,
+  updateConfig,
+} from '../api/client';
+import type { SimulatorStatus } from '../api/client';
 import { useTemperature } from '../contexts/TemperatureContext';
 import type { IcemakerConfig } from '../types/icemaker';
 
@@ -41,6 +48,7 @@ function ConfigField({ label, value, unit, min, max, step, onChange, disabled }:
 
 export function Configuration() {
   const [config, setConfig] = useState<IcemakerConfig | null>(null);
+  const [simStatus, setSimStatus] = useState<SimulatorStatus | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Partial<IcemakerConfig>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,8 +64,12 @@ export function Configuration() {
     try {
       setIsLoading(true);
       setError(null);
-      const data = await fetchConfig();
-      setConfig(data);
+      const [configData, simData] = await Promise.all([
+        fetchConfig(),
+        fetchSimulatorStatus().catch(() => null),
+      ]);
+      setConfig(configData);
+      setSimStatus(simData);
       setPendingChanges({});
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load configuration');
@@ -88,6 +100,27 @@ export function Configuration() {
 
   const handleReset = () => {
     setPendingChanges({});
+  };
+
+  const handleSpeedChange = async (speed: number) => {
+    try {
+      const result = await setSimulatorSpeed(speed);
+      setSimStatus((prev) =>
+        prev ? { ...prev, speed_multiplier: result.speed_multiplier } : null
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to set speed');
+    }
+  };
+
+  const handleSimulatorReset = async () => {
+    try {
+      await resetSimulator();
+      const simData = await fetchSimulatorStatus();
+      setSimStatus(simData);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reset simulator');
+    }
   };
 
   const getValue = (key: keyof IcemakerConfig): number => {
@@ -139,6 +172,32 @@ export function Configuration() {
 
       {isExpanded && (
         <>
+          {simStatus?.enabled && (
+            <div className="config-section">
+              <h4>Simulator</h4>
+              <div className="config-speed-control">
+                <label className="config-label">Speed</label>
+                <div className="speed-buttons">
+                  {[1, 5, 10, 30, 60].map((speed) => (
+                    <button
+                      key={speed}
+                      className={`speed-btn ${simStatus.speed_multiplier === speed ? 'active' : ''}`}
+                      onClick={() => handleSpeedChange(speed)}
+                    >
+                      {speed}x
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleSimulatorReset}
+                >
+                  Reset Temps
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="config-section">
             <h4>Temperature Thresholds</h4>
             <div className="config-grid">

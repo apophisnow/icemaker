@@ -2,6 +2,7 @@
  * Display current icemaker state with visual indicator.
  */
 
+import { useEffect, useState } from 'react';
 import type { IcemakerState, IcemakerStatus } from '../types/icemaker';
 import { useTemperature } from '../contexts/TemperatureContext';
 
@@ -10,6 +11,7 @@ interface StateDisplayProps {
 }
 
 const STATE_COLORS: Record<IcemakerState, string> = {
+  OFF: '#374151',
   IDLE: '#6b7280',
   POWER_ON: '#f59e0b',
   CHILL: '#3b82f6',
@@ -20,7 +22,8 @@ const STATE_COLORS: Record<IcemakerState, string> = {
 };
 
 const STATE_DESCRIPTIONS: Record<IcemakerState, string> = {
-  IDLE: 'System idle, waiting for start',
+  OFF: 'System powered off',
+  IDLE: 'Ready, waiting for start',
   POWER_ON: 'Priming water system',
   CHILL: 'Cooling plate',
   ICE: 'Making ice',
@@ -35,8 +38,30 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+function calculateTimeInState(stateEnterTime: string): number {
+  const enterTime = new Date(stateEnterTime).getTime();
+  const now = Date.now();
+  return Math.max(0, (now - enterTime) / 1000);
+}
+
 export function StateDisplay({ status }: StateDisplayProps) {
   const { formatTemp } = useTemperature();
+  const [timeInState, setTimeInState] = useState(0);
+
+  // Update time in state every second
+  useEffect(() => {
+    if (!status?.state_enter_time) return;
+
+    // Calculate initial value
+    setTimeInState(calculateTimeInState(status.state_enter_time));
+
+    // Update every second
+    const interval = setInterval(() => {
+      setTimeInState(calculateTimeInState(status.state_enter_time));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [status?.state_enter_time]);
 
   if (!status) return null;
 
@@ -66,7 +91,7 @@ export function StateDisplay({ status }: StateDisplayProps) {
 
         <div className="detail-item">
           <span className="label">Time in State</span>
-          <span className="value">{formatTime(status.time_in_state_seconds)}</span>
+          <span className="value">{formatTime(timeInState)}</span>
         </div>
 
         <div className="detail-item">
