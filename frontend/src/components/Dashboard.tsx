@@ -11,6 +11,7 @@ import { Controls } from './Controls';
 import { DataLogger } from './DataLogger';
 import { RelayStatus } from './RelayStatus';
 import { StateDisplay } from './StateDisplay';
+import { SystemDiagram } from './SystemDiagram';
 import { TemperatureChart } from './TemperatureChart';
 
 export function Dashboard() {
@@ -85,6 +86,15 @@ export function Dashboard() {
 
         <section className="relay-section">
           <RelayStatus relays={relays} />
+        </section>
+
+        <section className="diagram-section">
+          <SystemDiagram
+            relays={relays}
+            plateTemp={status?.plate_temp ?? null}
+            binTemp={status?.bin_temp ?? null}
+            state={status?.state ?? null}
+          />
         </section>
 
         <section className="controls-section">
