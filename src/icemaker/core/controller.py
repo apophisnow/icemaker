@@ -206,6 +206,7 @@ class IcemakerController:
         await self._set_relay(RelayName.HOT_GAS_SOLENOID, False)
         await self._set_relay(RelayName.WATER_VALVE, False)
         await self._set_relay(RelayName.RECIRCULATING_PUMP, with_recirculation)
+        await self._set_relay(RelayName.ICE_CUTTER, True)  # Ice cutter ON during cycle
 
     async def _set_heating_relays(self) -> None:
         """Set relays for heating/harvest mode."""
@@ -401,7 +402,15 @@ class IcemakerController:
         fsm: AsyncFSM,
         ctx: FSMContext,
     ) -> Optional[IcemakerState]:
-        """Handle HEAT state - harvest ice."""
+        """Handle HEAT state - harvest ice.
+
+        Per reference implementation:
+        - Condenser fan OFF, recirculating pump OFF
+        - Water valve ON (entire duration to refill reservoir)
+        - Hot gas solenoid ON (heats plate to release ice)
+        - Ice cutter ON
+        - Compressors stay ON (from ice making phase)
+        """
         target_temp = self.config.harvest.target_temp
         timeout = self.config.harvest.timeout_seconds
         ctx.target_temp = target_temp
@@ -428,8 +437,9 @@ class IcemakerController:
             ctx.chill_mode = "rechill"
             return IcemakerState.CHILL
 
-        # Keep heating
+        # Keep heating with water valve open (per reference: water_valve ON entire harvest)
         await self._set_heating_relays()
+
         return None
 
     async def _handle_error(

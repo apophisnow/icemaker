@@ -17,6 +17,7 @@ class StateConfig:
 
     target_temp: float
     timeout_seconds: int
+    refill_time_seconds: int | None = None
 
 
 @dataclass
@@ -35,7 +36,7 @@ class IcemakerConfig:
         default_factory=lambda: StateConfig(target_temp=-2.0, timeout_seconds=1500)
     )
     harvest: StateConfig = field(
-        default_factory=lambda: StateConfig(target_temp=38.0, timeout_seconds=240)
+        default_factory=lambda: StateConfig(target_temp=38.0, timeout_seconds=240, refill_time_seconds = 18)
     )
     rechill: StateConfig = field(
         default_factory=lambda: StateConfig(target_temp=35.0, timeout_seconds=300)
@@ -167,6 +168,7 @@ def _apply_env_overrides(config: IcemakerConfig) -> IcemakerConfig:
         "ICEMAKER_ICE_TIMEOUT": ("ice_making", "timeout_seconds", int),
         "ICEMAKER_HARVEST_TEMP": ("harvest", "target_temp", float),
         "ICEMAKER_HARVEST_TIMEOUT": ("harvest", "timeout_seconds", int),
+        "ICEMAKER_HARVEST_REFILL_TIME": ("harvest", "refill_time_seconds", int),
         "ICEMAKER_RECHILL_TEMP": ("rechill", "target_temp", float),
         "ICEMAKER_RECHILL_TIMEOUT": ("rechill", "timeout_seconds", int),
         "ICEMAKER_BIN_THRESHOLD": ("bin_full_threshold", None, float),

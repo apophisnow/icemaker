@@ -21,19 +21,22 @@ class ThermalParameters:
 
     # Ambient conditions
     ambient_temp_f: float = 70.0  # Room temperature
-    water_input_temp_f: float = 55.0  # Cold water temperature
+    water_input_temp_f: float = 55.0  # Fresh water temperature from valve
 
     # Cooling rates (degrees F per second when at ambient)
-    compressor_cooling_rate: float = 0.15  # Compressor + condenser active
-    compressor_only_rate: float = 0.05  # Compressor on, no condenser
+    compressor_cooling_rate: float = 11.75  # Compressor + condenser active
+    compressor_only_rate: float = 12.7  # Compressor on, no condenser
 
     # Heating rates (degrees F per second)
-    hot_gas_heating_rate: float = 0.8  # Hot gas solenoid active
+    hot_gas_heating_rate: float = 10.8  # Hot gas solenoid active
     natural_warming_rate: float = 0.02  # Passive drift toward ambient
 
-    # Water/recirculation effects
-    water_cooling_effect: float = -5.0  # Temp drop from water fill
-    recirculation_multiplier: float = 1.2  # Cooling enhancement factor
+    # Water/recirculation heat transfer
+    water_plate_transfer_rate: float = 0.3  # Heat transfer coefficient plate<->water
+
+    # Water reservoir parameters
+    reservoir_volume_oz: float = 32.0  # Reservoir capacity in fluid ounces
+    valve_flow_rate_oz_per_sec: float = 2.0  # Water valve flow rate (fills in ~16 sec)
 
     # Thermal mass (affects rate of temperature change)
     # Higher = slower temperature changes
@@ -43,6 +46,7 @@ class ThermalParameters:
     # Temperature limits
     min_temp_f: float = -10.0
     max_temp_f: float = 100.0
+    freezing_point_f: float = 32.0  # Water freezes here
 
     # Simulation speed multiplier (for faster-than-realtime simulation)
     speed_multiplier: float = 1.0
@@ -54,6 +58,8 @@ class ThermalState:
 
     plate_temp_f: float = 70.0
     bin_temp_f: float = 70.0
+    water_temp_f: float = 70.0  # Water reservoir starts at room temp
+    water_volume_oz: float = 32.0  # Current water in reservoir
     last_update: float = field(default_factory=time.monotonic)
 
 
@@ -115,28 +121,33 @@ class ThermalModel:
         """
         rate = 0.0
 
-        # Check compressor state
+        # Check relay states
         compressor_on = (
             self._relay_states.get(RelayName.COMPRESSOR_1, False)
             or self._relay_states.get(RelayName.COMPRESSOR_2, False)
         )
         condenser_on = self._relay_states.get(RelayName.CONDENSER_FAN, False)
+        hot_gas_on = self._relay_states.get(RelayName.HOT_GAS_SOLENOID, False)
 
-        # Cooling from compressor
-        if compressor_on:
-            if condenser_on:
-                rate -= self.params.compressor_cooling_rate
-            else:
-                rate -= self.params.compressor_only_rate
-
-        # Heating from hot gas solenoid
-        if self._relay_states.get(RelayName.HOT_GAS_SOLENOID, False):
+        # Hot gas solenoid redirects hot refrigerant to the plate for heating
+        # When hot gas is ON, compressor provides heat instead of cooling
+        if hot_gas_on and compressor_on:
+            # Hot gas bypass: compressor pumps hot refrigerant directly to plate
             rate += self.params.hot_gas_heating_rate
+        elif compressor_on:
+            # Normal cooling mode (efficiency decreases at higher ambient temps)
+            ambient_penalty = max(0, (self.params.ambient_temp_f - 70.0) * 0.02)
+            efficiency = max(0.5, 1.0 - ambient_penalty)  # Floor at 50% efficiency
 
-        # Recirculation pump enhances cooling (when cooling is active)
+            if condenser_on:
+                rate -= self.params.compressor_cooling_rate * efficiency
+            else:
+                rate -= self.params.compressor_only_rate * efficiency
+
+        # Recirculation pump causes heat transfer between plate and water
         if self._relay_states.get(RelayName.RECIRCULATING_PUMP, False):
-            if rate < 0:  # Only enhances cooling, not heating
-                rate *= self.params.recirculation_multiplier
+            water_plate_diff = self.state.water_temp_f - self.state.plate_temp_f
+            rate += water_plate_diff * self.params.water_plate_transfer_rate
 
         # Natural drift toward ambient (Newton's law of cooling approximation)
         temp_diff = self.params.ambient_temp_f - self.state.plate_temp_f
@@ -145,12 +156,58 @@ class ThermalModel:
         # Apply thermal mass (higher mass = slower change)
         return rate / self.params.plate_thermal_mass
 
+    def _update_water_reservoir(self, dt: float) -> None:
+        """Update water reservoir temperature and volume.
+
+        Models a physical reservoir where:
+        - Water valve adds fresh water at input temp, displacing existing water
+          (passive overflow drain)
+        - Recirculation transfers heat between plate and water
+        - Water at freezing point leaves as ice on the plate
+
+        Args:
+            dt: Effective time step in seconds (after speed multiplier).
+        """
+        # Handle water valve - fresh water displaces old water
+        if self._relay_states.get(RelayName.WATER_VALVE, False):
+            # Calculate how much fresh water enters this timestep
+            fresh_water_oz = self.params.valve_flow_rate_oz_per_sec * dt
+            reservoir_vol = self.params.reservoir_volume_oz
+
+            # Mix fresh water with existing - weighted average by volume
+            # Fresh water displaces old (overflow drain), so total stays at reservoir_volume
+            if fresh_water_oz >= reservoir_vol:
+                # Complete replacement
+                self.state.water_temp_f = self.params.water_input_temp_f
+            else:
+                # Partial mixing: weighted average by volume
+                # new_temp = (old_vol * old_temp + fresh_vol * fresh_temp) / total
+                old_water_oz = reservoir_vol - fresh_water_oz
+                self.state.water_temp_f = (
+                    (old_water_oz * self.state.water_temp_f)
+                    + (fresh_water_oz * self.params.water_input_temp_f)
+                ) / reservoir_vol
+
+        # Recirculation pump causes heat transfer between water and plate
+        if self._relay_states.get(RelayName.RECIRCULATING_PUMP, False):
+            plate_water_diff = self.state.plate_temp_f - self.state.water_temp_f
+            self.state.water_temp_f += plate_water_diff * self.params.water_plate_transfer_rate * dt
+
+        # Natural drift toward ambient (slower than plate)
+        ambient_diff = self.params.ambient_temp_f - self.state.water_temp_f
+        self.state.water_temp_f += ambient_diff * self.params.natural_warming_rate / 20.0 * dt
+
+        # Water can't go below freezing (it becomes ice and leaves the reservoir)
+        self.state.water_temp_f = max(
+            self.params.freezing_point_f, self.state.water_temp_f
+        )
+
     def _calculate_bin_rate(self) -> float:
         """Calculate bin temperature rate of change (deg F/s).
 
         The bin temperature is affected by:
         - Heat transfer from the plate
-        - Natural drift toward ambient
+        - Natural drift toward ambient (bin is NOT refrigerated, so melting occurs)
 
         Returns:
             Rate of temperature change for the bin.
@@ -160,9 +217,10 @@ class ThermalModel:
             (self.state.plate_temp_f - self.state.bin_temp_f) * 0.005
         )
 
-        # Ambient affects bin temperature
+        # Ambient affects bin temperature (higher rate since bin is unrefrigerated)
+        # Ice melts faster at higher room temps per the manual
         ambient_effect = (
-            (self.params.ambient_temp_f - self.state.bin_temp_f) * 0.002
+            (self.params.ambient_temp_f - self.state.bin_temp_f) * 0.008
         )
 
         # Apply thermal mass
@@ -177,15 +235,18 @@ class ThermalModel:
         # Apply speed multiplier
         effective_dt = dt * self.params.speed_multiplier
 
-        # Calculate rates
+        # Calculate rates for plate and bin
         plate_rate = self._calculate_plate_rate()
         bin_rate = self._calculate_bin_rate()
 
-        # Apply changes
+        # Apply changes to plate and bin
         self.state.plate_temp_f += plate_rate * effective_dt
         self.state.bin_temp_f += bin_rate * effective_dt
 
-        # Clamp to valid range
+        # Update water reservoir (volume-based mixing model)
+        self._update_water_reservoir(effective_dt)
+
+        # Clamp plate and bin to valid range
         self.state.plate_temp_f = max(
             self.params.min_temp_f,
             min(self.params.max_temp_f, self.state.plate_temp_f),
@@ -247,14 +308,18 @@ class ThermalModel:
         self,
         plate_temp: float = 70.0,
         bin_temp: float = 70.0,
+        water_temp: float = 70.0,
     ) -> None:
         """Reset simulation to initial temperatures.
 
         Args:
             plate_temp: Initial plate temperature.
             bin_temp: Initial bin temperature.
+            water_temp: Initial water reservoir temperature.
         """
         self.state.plate_temp_f = plate_temp
         self.state.bin_temp_f = bin_temp
+        self.state.water_temp_f = water_temp
+        self.state.water_volume_oz = self.params.reservoir_volume_oz
         for relay in RelayName:
             self._relay_states[relay] = False
