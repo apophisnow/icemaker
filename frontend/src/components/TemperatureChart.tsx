@@ -22,6 +22,23 @@ interface TemperatureChartProps {
 }
 
 /**
+ * Format simulated time as human-readable elapsed time.
+ */
+function formatSimulatedTime(seconds: number): string {
+  if (seconds < 60) {
+    return `${Math.floor(seconds)}s`;
+  }
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}m ${s}s`;
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
+/**
  * Custom label for the target reference line.
  * Renders text positioned above the line so it doesn't overlap.
  */
@@ -46,12 +63,17 @@ function TargetLabel({ viewBox, value }: { viewBox?: { x: number; y: number; wid
 export function TemperatureChart({ data, targetTemp }: TemperatureChartProps) {
   const { convertTemp, unit } = useTemperature();
 
+  // Check if we have simulated time data (simulator mode)
+  const hasSimulatedTime = data.length > 0 && data[0].simulated_time_seconds !== undefined;
+
   // Format data for recharts - convert to display unit
   const chartData = data.map((reading, index) => ({
     index,
     plate: convertTemp(reading.plate_temp_f),
     bin: convertTemp(reading.bin_temp_f),
-    time: new Date(reading.timestamp).toLocaleTimeString(),
+    time: hasSimulatedTime && reading.simulated_time_seconds !== undefined
+      ? formatSimulatedTime(reading.simulated_time_seconds)
+      : new Date(reading.timestamp).toLocaleTimeString(),
   }));
 
   // Calculate Y-axis domain using converted temps
@@ -69,7 +91,7 @@ export function TemperatureChart({ data, targetTemp }: TemperatureChartProps) {
 
   return (
     <div className="temperature-chart">
-      <h3>Temperature History</h3>
+      <h3>Temperature History {hasSimulatedTime && <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>(Simulated Time)</span>}</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />

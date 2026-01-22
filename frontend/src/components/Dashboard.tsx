@@ -31,9 +31,12 @@ export function Dashboard() {
   // Log data when status updates and logging is active
   useEffect(() => {
     if (isLogging && status) {
-      logData(status, relays);
+      // Get simulated time from the latest temperature reading
+      const latestReading = temperatureHistory[temperatureHistory.length - 1];
+      const simulatedTime = latestReading?.simulated_time_seconds;
+      logData(status, relays, simulatedTime);
     }
-  }, [isLogging, status, relays, logData]);
+  }, [isLogging, status, relays, temperatureHistory, logData]);
 
   if (isLoading) {
     return (

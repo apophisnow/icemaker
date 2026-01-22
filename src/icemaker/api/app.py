@@ -114,20 +114,21 @@ async def _poll_sensors_loop() -> None:
             controller.fsm.context.plate_temp = temps.get(SensorName.PLATE, 70.0)
             controller.fsm.context.bin_temp = temps.get(SensorName.ICE_BIN, 70.0)
 
-            # Get water temperature and ice thickness from thermal model if available
+            # Get simulator data from thermal model if available
             water_temp = None
-            ice_thickness = None
+            simulated_time = None
             if controller._thermal_model is not None:
                 water_temp = controller._thermal_model.get_water_temp()
-                ice_thickness = controller._thermal_model.get_ice_thickness()
+                simulated_time = controller._thermal_model.get_simulated_time()
 
             # Broadcast temperature update via WebSocket
             await app_state.ws_manager.broadcast_temp_update(
                 controller.fsm.context.plate_temp,
                 controller.fsm.context.bin_temp,
                 water_temp,
-                ice_thickness,
                 controller.fsm.context.target_temp,
+                simulated_time,
+                controller.fsm.time_in_state(),
             )
 
         except asyncio.CancelledError:

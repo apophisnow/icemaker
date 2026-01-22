@@ -15,7 +15,7 @@ from ..hal.base import (
     TemperatureSensorInterface,
 )
 from ..hal.factory import create_hal, create_hal_with_simulator
-from ..simulator.thermal_model import ThermalModel
+from ..simulator.physics_model import PhysicsSimulator
 from .events import Event, EventType, relay_changed_event, temp_reading_event
 from .fsm import AsyncFSM, FSMContext
 from .states import ChillMode, IcemakerState
@@ -32,12 +32,18 @@ class IcemakerController:
     The controller implements the ice-making cycle:
     0. OFF: System powered off
     1. POWER_ON: Prime water system (runs on power_on())
-    2. IDLE: Ready state, waiting for user to start cycle
+    2. STANDBY: Waiting for manual start_cycle() call
     3. CHILL (prechill): Cool plate to 32°F
     4. ICE: Make ice at -2°F with recirculation
     5. HEAT: Harvest ice at 38°F
     6. CHILL (rechill): Cool to 35°F
-    7. Check bin, repeat or return to IDLE
+    7. Check bin:
+       - Bin full: IDLE (auto-restarts when bin empties)
+       - Bin not full: repeat cycle
+
+    STANDBY vs IDLE:
+    - STANDBY: Manual control - waits for explicit start_cycle()
+    - IDLE: Active ice-making paused - auto-restarts when bin empties
     """
 
     def __init__(
@@ -45,7 +51,7 @@ class IcemakerController:
         config: Optional[IcemakerConfig] = None,
         gpio: Optional[GPIOInterface] = None,
         sensors: Optional[TemperatureSensorInterface] = None,
-        thermal_model: Optional[ThermalModel] = None,
+        thermal_model: Optional[PhysicsSimulator] = None,
     ) -> None:
         """Initialize the controller.
 
@@ -110,8 +116,13 @@ class IcemakerController:
         await self._gpio.setup(DEFAULT_RELAY_CONFIG)
         await self._sensors.setup(DEFAULT_SENSOR_IDS)
 
+        # Connect FSM to simulated time if using simulator
+        if self._thermal_model is not None:
+            self._fsm.set_simulated_time_getter(self._thermal_model.get_simulated_time)
+
         # Register state handlers
         self._fsm.register_handler(IcemakerState.OFF, self._handle_off)
+        self._fsm.register_handler(IcemakerState.STANDBY, self._handle_standby)
         self._fsm.register_handler(IcemakerState.IDLE, self._handle_idle)
         self._fsm.register_handler(IcemakerState.POWER_ON, self._handle_power_on)
         self._fsm.register_handler(IcemakerState.CHILL, self._handle_chill)
@@ -193,21 +204,22 @@ class IcemakerController:
         return await self._fsm.transition_to(IcemakerState.OFF)
 
     async def start_cycle(self) -> bool:
-        """Start an ice-making cycle from IDLE state.
+        """Start an ice-making cycle from STANDBY or IDLE state.
 
         Returns:
-            True if cycle started, False if not in IDLE state.
+            True if cycle started, False if not in a valid state.
         """
-        if self._fsm.state != IcemakerState.IDLE:
+        if self._fsm.state not in {IcemakerState.STANDBY, IcemakerState.IDLE}:
             return False
         self._fsm.context.chill_mode = "prechill"
+        self._fsm.context.cycle_start_time = datetime.now()
         return await self._fsm.transition_to(IcemakerState.CHILL)
 
     async def stop_cycle(self) -> bool:
-        """Stop the current ice-making cycle and return to IDLE.
+        """Stop the current ice-making cycle and return to STANDBY.
 
-        Can be called from CHILL, ICE, or HEAT states.
-        Use start_cycle() to begin a new cycle from IDLE.
+        Can be called from CHILL, ICE, HEAT, or IDLE states.
+        Use start_cycle() to begin a new cycle from STANDBY.
 
         Returns:
             True if stopped, False if not in an active cycle state.
@@ -216,10 +228,11 @@ class IcemakerController:
             IcemakerState.CHILL,
             IcemakerState.ICE,
             IcemakerState.HEAT,
+            IcemakerState.IDLE,
         }
         if self._fsm.state not in active_states:
             return False
-        return await self._fsm.transition_to(IcemakerState.IDLE)
+        return await self._fsm.transition_to(IcemakerState.STANDBY)
 
     async def emergency_stop(self) -> None:
         """Emergency stop - turn off all relays and go to OFF."""
@@ -309,15 +322,49 @@ class IcemakerController:
         # Wait for explicit power_on() call
         return None
 
+    async def _handle_standby(
+        self,
+        fsm: AsyncFSM,
+        ctx: FSMContext,
+    ) -> Optional[IcemakerState]:
+        """Handle STANDBY state - powered on, waiting for manual start.
+
+        Unlike IDLE, STANDBY does NOT auto-restart when bin empties.
+        User must explicitly call start_cycle() to begin ice making.
+        """
+        # Ensure all relays are off while in standby
+        await self._all_relays_off()
+        # Wait for explicit start_cycle() call
+        return None
+
     async def _handle_idle(
         self,
         fsm: AsyncFSM,
         ctx: FSMContext,
     ) -> Optional[IcemakerState]:
-        """Handle IDLE state - powered on, ready to make ice."""
+        """Handle IDLE state - powered on, ready to make ice.
+
+        If we entered IDLE because the bin was full, periodically check
+        if the bin has emptied enough to resume ice making.
+        Following mark_icemaker2.py: check every minute, restart when bin_temp >= threshold.
+        """
         # Ensure all relays are off while idle
         await self._all_relays_off()
-        # Wait for explicit start_cycle() call
+
+        # Check if bin has emptied enough to resume
+        # bin_full returns True when temp < threshold (35°F)
+        # So when temp >= threshold, bin is NOT full and we can restart
+        if not self._is_bin_full():
+            logger.info(
+                "Bin no longer full (temp %.1f°F >= %.1f°F), restarting ice cycle",
+                ctx.bin_temp,
+                self.config.bin_full_threshold,
+            )
+            ctx.chill_mode = "prechill"
+            ctx.cycle_start_time = datetime.now()
+            return IcemakerState.CHILL
+
+        # Stay in IDLE, waiting for bin to empty or manual start
         return None
 
     async def _handle_power_on(
@@ -352,9 +399,9 @@ class IcemakerController:
             await self._set_relay(RelayName.WATER_VALVE, True)
             return None
 
-        # Done - transition to IDLE (ready for user to start cycle)
+        # Done - transition to STANDBY (ready for user to start cycle)
         await self._set_relay(RelayName.WATER_VALVE, False)
-        return IcemakerState.IDLE
+        return IcemakerState.STANDBY
 
     async def _handle_chill(
         self,
@@ -374,6 +421,9 @@ class IcemakerController:
 
         ctx.target_temp = target_temp
 
+        # Set relays FIRST, before checking conditions
+        await self._set_cooling_relays(with_recirculation=False)
+
         # Check if we've reached target or timed out
         elapsed = fsm.time_in_state()
         if ctx.plate_temp <= target_temp:
@@ -391,11 +441,14 @@ class IcemakerController:
                 ctx.chill_mode = None
                 ctx.cycle_count += 1
                 if self._is_bin_full():
-                    logger.info("Bin full, entering IDLE")
+                    logger.info("Bin full (temp %.1f°F < %.1f°F), entering IDLE to wait",
+                                ctx.bin_temp, self.config.bin_full_threshold)
+                    # Go to IDLE - it will poll and auto-restart when bin empties
                     return IcemakerState.IDLE
                 else:
-                    # Start next cycle - transition to ICE state which will
-                    # go through HEAT and back to CHILL with proper timing reset
+                    # Bin not full - start next cycle immediately
+                    logger.info("Bin not full (temp %.1f°F), starting next cycle",
+                                ctx.bin_temp)
                     ctx.chill_mode = "prechill"
                     ctx.cycle_start_time = datetime.now()
                     return IcemakerState.ICE
@@ -420,8 +473,6 @@ class IcemakerController:
                 ctx.cycle_start_time = datetime.now()
                 return IcemakerState.ICE
 
-        # Keep cooling
-        await self._set_cooling_relays(with_recirculation=False)
         return None
 
     async def _handle_ice(
@@ -433,6 +484,9 @@ class IcemakerController:
         target_temp = self.config.ice_making.target_temp
         timeout = self.config.ice_making.timeout_seconds
         ctx.target_temp = target_temp
+
+        # Set relays FIRST, before checking conditions
+        await self._set_cooling_relays(with_recirculation=True)
 
         elapsed = fsm.time_in_state()
 
@@ -454,8 +508,6 @@ class IcemakerController:
             )
             return IcemakerState.HEAT
 
-        # Keep cooling with recirculation
-        await self._set_cooling_relays(with_recirculation=True)
         return None
 
     async def _handle_heat(
@@ -475,6 +527,10 @@ class IcemakerController:
         target_temp = self.config.harvest.target_temp
         timeout = self.config.harvest.timeout_seconds
         ctx.target_temp = target_temp
+
+        # Set relays FIRST, before checking conditions
+        # (ensures relays are correct even if we transition away this cycle)
+        await self._set_heating_relays()
 
         elapsed = fsm.time_in_state()
 
@@ -497,9 +553,6 @@ class IcemakerController:
             )
             ctx.chill_mode = "rechill"
             return IcemakerState.CHILL
-
-        # Keep heating with water valve open (per reference: water_valve ON entire harvest)
-        await self._set_heating_relays()
 
         return None
 

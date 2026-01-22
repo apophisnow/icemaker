@@ -76,15 +76,16 @@ export function Controls({ currentState, onError, onRefresh }: ControlsProps) {
   };
 
   const isOff = currentState === 'OFF';
+  const isStandby = currentState === 'STANDBY';
   const isIdle = currentState === 'IDLE';
   const isPoweringOn = currentState === 'POWER_ON';
   const isInCycle = currentState && ['CHILL', 'ICE', 'HEAT'].includes(currentState);
   const isError = currentState === 'ERROR';
 
   const canPowerOn = isOff;
-  const canPowerOff = isIdle || isError;
-  const canStart = isIdle;
-  const canStop = isInCycle;
+  const canPowerOff = isStandby || isError;
+  const canStart = isStandby || isIdle;
+  const canStop = isInCycle || isIdle;
 
   return (
     <div className="controls">
@@ -141,8 +142,9 @@ export function Controls({ currentState, onError, onRefresh }: ControlsProps) {
         <p>
           {isOff && 'System is off. Press Power On to initialize.'}
           {isPoweringOn && 'Powering on... Water system priming in progress.'}
-          {isIdle && 'Ready. Press Start Cycle to begin making ice.'}
-          {isInCycle && 'Cycle in progress. Press Stop to return to idle.'}
+          {isStandby && 'Ready. Press Start Cycle to begin making ice.'}
+          {isIdle && 'Paused (bin full). Will auto-restart when bin empties, or press Stop to go to standby.'}
+          {isInCycle && 'Cycle in progress. Press Stop to return to standby.'}
           {isError && 'Error state. Use Emergency Stop to reset.'}
         </p>
       </div>

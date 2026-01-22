@@ -1,5 +1,5 @@
 # Development Configuration
-# Shorter timeouts and simulator enabled for faster iteration
+# Timeouts tuned for physics-based simulation
 
 log_level: DEBUG
 poll_interval: 1.0
@@ -7,20 +7,20 @@ poll_interval: 1.0
 states:
   prechill:
     target_temp: 32.0
-    timeout_seconds: 30  # Shortened for dev
+    timeout_seconds: 120  # 2 minutes to cool from 70°F to 32°F
 
   ice_making:
     target_temp: -2.0
-    timeout_seconds: 60  # Shortened for dev
+    timeout_seconds: 1500  # 25 minutes for ice to form on plate
 
   harvest:
     target_temp: 38.0
-    timeout_seconds: 30  # Shortened for dev
+    timeout_seconds: 240  # 4 minutes to heat plate for ice release
 
   rechill:
     target_temp: 35.0
-    timeout_seconds: 30  # Shortened for dev
+    timeout_seconds: 300  # 5 minutes rechill
 
 simulation:
   enabled: true
-  speed: 10.0  # 10x faster simulation
+  speed: 1.0  # Real-time simulation (adjustable via UI)

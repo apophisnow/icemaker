@@ -15,6 +15,7 @@ import type { IcemakerStatus, RelayStates } from '../types/icemaker';
 
 export interface LogEntry {
   timestamp: string;
+  simulated_time_seconds: number | null;
   state: string;
   plate_temp_f: number;
   bin_temp_f: number;
@@ -38,7 +39,7 @@ interface DataLoggerContextValue {
   stopLogging: () => void;
   downloadLog: () => void;
   clearLog: () => void;
-  logData: (status: IcemakerStatus, relays: RelayStates | null) => void;
+  logData: (status: IcemakerStatus, relays: RelayStates | null, simulatedTime?: number) => void;
 }
 
 const DataLoggerContext = createContext<DataLoggerContextValue | null>(null);
@@ -71,11 +72,12 @@ export function DataLoggerProvider({ children }: DataLoggerProviderProps) {
   }, []);
 
   const logData = useCallback(
-    (status: IcemakerStatus, relays: RelayStates | null) => {
+    (status: IcemakerStatus, relays: RelayStates | null, simulatedTime?: number) => {
       if (!isLogging) return;
 
       const entry: LogEntry = {
         timestamp: new Date().toISOString(),
+        simulated_time_seconds: simulatedTime ?? null,
         state: status.state,
         plate_temp_f: status.plate_temp,
         bin_temp_f: status.bin_temp,
@@ -104,6 +106,7 @@ export function DataLoggerProvider({ children }: DataLoggerProviderProps) {
     // Build CSV header
     const headers = [
       'timestamp',
+      'simulated_time_seconds',
       'state',
       'plate_temp_f',
       'bin_temp_f',
@@ -123,6 +126,7 @@ export function DataLoggerProvider({ children }: DataLoggerProviderProps) {
     const rows = entries.map((entry) =>
       [
         entry.timestamp,
+        entry.simulated_time_seconds?.toFixed(2) ?? '',
         entry.state,
         entry.plate_temp_f.toFixed(2),
         entry.bin_temp_f.toFixed(2),

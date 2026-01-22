@@ -1,26 +1,26 @@
-"""Simulated HAL connected to thermal model."""
+"""Simulated HAL connected to physics simulator."""
 
 from ..hal.base import GPIOInterface, TemperatureSensorInterface
 from ..hal.mock_gpio import MockGPIO
 from ..hal.mock_sensors import MockSensors
-from .thermal_model import ThermalModel, ThermalParameters
+from .physics_model import PhysicsSimulator, SimulatorParams
 
 
 def create_simulated_hal(
-    thermal_params: ThermalParameters | None = None,
-) -> tuple[GPIOInterface, TemperatureSensorInterface, ThermalModel]:
-    """Create HAL implementations connected to thermal simulator.
+    params: SimulatorParams | None = None,
+) -> tuple[GPIOInterface, TemperatureSensorInterface, PhysicsSimulator]:
+    """Create HAL implementations connected to physics simulator.
 
     Creates mock GPIO and sensors that are connected to a physics-based
-    thermal model. When relay states change, the thermal model adjusts
-    its temperature calculations accordingly. Temperature readings come
-    from the thermal model simulation.
+    simulator. When relay states change, the simulator adjusts its
+    temperature calculations accordingly. Temperature readings come
+    from the physics simulation.
 
     Example:
-        gpio, sensors, model = create_simulated_hal()
+        gpio, sensors, simulator = create_simulated_hal()
         await gpio.setup(DEFAULT_RELAY_CONFIG)
         await sensors.setup(DEFAULT_SENSOR_IDS)
-        await model.start()  # Run simulation in background
+        await simulator.start()  # Run simulation in background
 
         # Now relay changes affect temperatures
         await gpio.set_relay(RelayName.COMPRESSOR_1, True)
@@ -29,21 +29,21 @@ def create_simulated_hal(
         temp = await sensors.read_temperature(SensorName.PLATE)
 
     Args:
-        thermal_params: Custom thermal parameters. Uses defaults if None.
+        params: Custom simulator parameters. Uses defaults if None.
 
     Returns:
-        Tuple of (GPIO, Sensors, ThermalModel).
-        The thermal model must be started separately with model.start()
-        or model.run() (blocking).
+        Tuple of (GPIO, Sensors, PhysicsSimulator).
+        The simulator must be started separately with simulator.start()
+        or simulator.run() (blocking).
     """
-    model = ThermalModel(thermal_params)
+    simulator = PhysicsSimulator(params)
 
-    # Create mock GPIO connected to thermal model
+    # Create mock GPIO connected to simulator
     gpio = MockGPIO()
-    gpio.set_change_callback(model.set_relay_state)
+    gpio.set_change_callback(simulator.set_relay_state)
 
-    # Create mock sensors connected to thermal model
+    # Create mock sensors connected to simulator
     sensors = MockSensors()
-    sensors.set_temperature_provider(model.get_temperature)
+    sensors.set_temperature_provider(simulator.get_temperature)
 
-    return gpio, sensors, model
+    return gpio, sensors, simulator

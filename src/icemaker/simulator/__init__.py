@@ -1,11 +1,12 @@
 """Physics-based icemaker simulation."""
 
-from .thermal_model import ThermalModel, ThermalParameters, ThermalState
+from .physics_model import PhysicsSimulator, SimulatorParams, Reservoir, CoolingPlate
 from .simulated_hal import create_simulated_hal
 
 __all__ = [
-    "ThermalModel",
-    "ThermalParameters",
-    "ThermalState",
+    "PhysicsSimulator",
+    "SimulatorParams",
+    "Reservoir",
+    "CoolingPlate",
     "create_simulated_hal",
 ]

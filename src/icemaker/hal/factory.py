@@ -14,7 +14,7 @@ from .base import (
 )
 
 if TYPE_CHECKING:
-    from ..simulator.thermal_model import ThermalModel
+    from ..simulator.physics_model import PhysicsSimulator
 
 logger = logging.getLogger(__name__)
 
@@ -84,19 +84,19 @@ def create_hal(
 def create_hal_with_simulator(
     relay_configs: dict[RelayName, RelayConfig] | None = None,
     sensor_ids: dict[SensorName, str] | None = None,
-) -> tuple[GPIOInterface, TemperatureSensorInterface, "ThermalModel"]:
-    """Create HAL implementations connected to thermal simulator.
+) -> tuple[GPIOInterface, TemperatureSensorInterface, "PhysicsSimulator"]:
+    """Create HAL implementations connected to physics simulator.
 
     Creates mock GPIO and sensors that are connected to a physics-based
-    thermal model. Relay state changes affect simulated temperatures.
+    simulator. Relay state changes affect simulated temperatures.
 
     Args:
         relay_configs: Custom relay configuration. Uses defaults if None.
         sensor_ids: Custom sensor IDs. Uses defaults if None.
 
     Returns:
-        Tuple of (GPIO, Sensors, ThermalModel).
-        The thermal model must be started separately with model.run().
+        Tuple of (GPIO, Sensors, PhysicsSimulator).
+        The simulator must be started separately with simulator.start().
     """
     from ..simulator.simulated_hal import create_simulated_hal
 

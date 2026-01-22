@@ -4,6 +4,7 @@
 
 export type IcemakerState =
   | 'OFF'
+  | 'STANDBY'
   | 'IDLE'
   | 'POWER_ON'
   | 'CHILL'
@@ -27,7 +28,7 @@ export interface TemperatureReading {
   plate_temp_f: number;
   bin_temp_f: number;
   water_temp_f?: number;
-  ice_thickness_mm?: number;
+  simulated_time_seconds?: number;
   timestamp: string;
 }
 
@@ -39,7 +40,6 @@ export interface IcemakerStatus {
   plate_temp: number;
   bin_temp: number;
   water_temp?: number;
-  ice_thickness_mm?: number;
   target_temp: number | null;
   time_in_state_seconds: number;
   chill_mode: string | null;
@@ -80,8 +80,9 @@ export interface TempUpdateData {
   plate_temp_f: number;
   bin_temp_f: number;
   water_temp_f?: number;
-  ice_thickness_mm?: number;
   target_temp?: number;
+  simulated_time_seconds?: number;
+  time_in_state_seconds?: number;
 }
 
 export interface RelayUpdateData {

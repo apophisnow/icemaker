@@ -24,6 +24,9 @@ class SimulatorStatus(BaseModel):
     water_temp_f: float
     plate_temp_f: float
     bin_temp_f: float
+    ice_thickness_mm: float = 0.0
+    bin_fill_percent: float = 0.0
+    bin_ice_mass_kg: float = 0.0
 
 
 class SpeedRequest(BaseModel):
@@ -52,8 +55,11 @@ async def get_simulator_status() -> SimulatorStatus:
         enabled=True,
         speed_multiplier=model.get_speed_multiplier(),
         water_temp_f=model.get_water_temp(),
-        plate_temp_f=model.state.plate_temp_f,
-        bin_temp_f=model.state.bin_temp_f,
+        plate_temp_f=model.plate.temp_f,
+        bin_temp_f=model.ice_bin.temp_f,
+        ice_thickness_mm=model.get_ice_thickness_mm(),
+        bin_fill_percent=model.get_bin_fill_percent(),
+        bin_ice_mass_kg=model.get_bin_ice_mass_kg(),
     )
 
 
@@ -70,7 +76,7 @@ async def get_water_temperature() -> dict:
 
     return {
         "water_temp_f": model.get_water_temp(),
-        "water_volume_ml": model.state.water_volume_ml,
+        "water_volume_liters": model.reservoir.volume_liters,
     }
 
 
@@ -131,7 +137,8 @@ async def reset_simulator() -> dict:
 
     return {
         "message": "Simulator reset to initial state",
-        "plate_temp_f": model.state.plate_temp_f,
-        "bin_temp_f": model.state.bin_temp_f,
-        "water_temp_f": model.state.water_temp_f,
+        "plate_temp_f": model.plate.temp_f,
+        "bin_temp_f": model.ice_bin.temp_f,
+        "water_temp_f": model.reservoir.temp_f,
+        "bin_fill_percent": model.get_bin_fill_percent(),
     }

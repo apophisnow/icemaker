@@ -2,12 +2,13 @@
  * Display current icemaker state with visual indicator.
  */
 
-import { useEffect, useState } from 'react';
 import type { IcemakerState, IcemakerStatus } from '../types/icemaker';
 import { useTemperature } from '../contexts/TemperatureContext';
 
 interface StateDisplayProps {
   status: IcemakerStatus | null;
+  /** Simulated time in state from latest temp update (for simulator mode) */
+  simulatedTimeInState?: number;
 }
 
 const STATE_COLORS: Record<IcemakerState, string> = {
@@ -38,30 +39,12 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function calculateTimeInState(stateEnterTime: string): number {
-  const enterTime = new Date(stateEnterTime).getTime();
-  const now = Date.now();
-  return Math.max(0, (now - enterTime) / 1000);
-}
-
-export function StateDisplay({ status }: StateDisplayProps) {
+export function StateDisplay({ status, simulatedTimeInState }: StateDisplayProps) {
   const { formatTemp } = useTemperature();
-  const [timeInState, setTimeInState] = useState(0);
 
-  // Update time in state every second
-  useEffect(() => {
-    if (!status?.state_enter_time) return;
-
-    // Calculate initial value
-    setTimeInState(calculateTimeInState(status.state_enter_time));
-
-    // Update every second
-    const interval = setInterval(() => {
-      setTimeInState(calculateTimeInState(status.state_enter_time));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [status?.state_enter_time]);
+  // Use backend-provided time_in_state_seconds (which uses simulated time in simulator mode)
+  // This updates with each WebSocket message from the backend
+  const timeInState = simulatedTimeInState ?? status?.time_in_state_seconds ?? 0;
 
   if (!status) return null;
 

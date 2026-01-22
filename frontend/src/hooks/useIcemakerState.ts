@@ -66,7 +66,7 @@ export function useIcemakerState() {
           plate_temp_f: data.plate_temp_f,
           bin_temp_f: data.bin_temp_f,
           water_temp_f: data.water_temp_f,
-          ice_thickness_mm: data.ice_thickness_mm,
+          simulated_time_seconds: data.simulated_time_seconds,
           timestamp: message.timestamp,
         };
         setState((prev) => ({
@@ -81,8 +81,8 @@ export function useIcemakerState() {
                 plate_temp: data.plate_temp_f,
                 bin_temp: data.bin_temp_f,
                 water_temp: data.water_temp_f,
-                ice_thickness_mm: data.ice_thickness_mm,
                 target_temp: data.target_temp ?? prev.status.target_temp,
+                time_in_state_seconds: data.time_in_state_seconds ?? prev.status.time_in_state_seconds,
               }
             : null,
         }));

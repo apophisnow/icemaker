@@ -30,9 +30,10 @@ class FSMContext:
         bin_temp: Current ice bin temperature in Fahrenheit.
         target_temp: Current target temperature for the active state.
         cycle_count: Number of completed ice-making cycles.
-        state_enter_time: When the current state was entered.
+        state_enter_time: When the current state was entered (wall clock).
         cycle_start_time: When the current cycle started.
         chill_mode: Current chill mode (PRECHILL or RECHILL).
+        simulated_state_enter_time: Simulated time when state was entered.
     """
 
     plate_temp: float = 70.0
@@ -42,6 +43,7 @@ class FSMContext:
     state_enter_time: datetime = field(default_factory=datetime.now)
     cycle_start_time: Optional[datetime] = None
     chill_mode: Optional[str] = None  # "prechill" or "rechill"
+    simulated_state_enter_time: Optional[float] = None  # Simulated seconds at state entry
 
 
 class AsyncFSM:
@@ -67,7 +69,7 @@ class AsyncFSM:
 
         Args:
             initial_state: State to start in.
-            poll_interval: Seconds between state handler polls.
+            poll_interval: Seconds between state handler polls (in simulated time when lockstep).
         """
         self._state = initial_state
         self._previous_state: Optional[IcemakerState] = None
@@ -77,6 +79,18 @@ class AsyncFSM:
         self._handlers: dict[IcemakerState, StateHandler] = {}
         self._listeners: list[EventListener] = []
         self._state_changed = asyncio.Event()
+        self._simulated_time_getter: Optional[Callable[[], float]] = None
+        self._last_poll_simulated_time: float = 0.0
+
+    def set_simulated_time_getter(self, getter: Callable[[], float]) -> None:
+        """Set a function to get current simulated time.
+
+        When set, time_in_state() will use simulated time instead of wall clock.
+
+        Args:
+            getter: Function that returns current simulated time in seconds.
+        """
+        self._simulated_time_getter = getter
 
     @property
     def state(self) -> IcemakerState:
@@ -172,6 +186,9 @@ class AsyncFSM:
         self._previous_state = self._state
         self._state = new_state
         self._context.state_enter_time = datetime.now()
+        # Record simulated time at state entry if available
+        if self._simulated_time_getter is not None:
+            self._context.simulated_state_enter_time = self._simulated_time_getter()
 
         # Enter new state
         await self._emit_event(
@@ -185,9 +202,16 @@ class AsyncFSM:
     def time_in_state(self) -> float:
         """Get seconds elapsed in current state.
 
+        Uses simulated time if available, otherwise wall clock time.
+
         Returns:
             Seconds since entering current state.
         """
+        if (
+            self._simulated_time_getter is not None
+            and self._context.simulated_state_enter_time is not None
+        ):
+            return self._simulated_time_getter() - self._context.simulated_state_enter_time
         return (datetime.now() - self._context.state_enter_time).total_seconds()
 
     async def wait_for_state_change(self, timeout: Optional[float] = None) -> bool:
@@ -214,9 +238,17 @@ class AsyncFSM:
 
         Continuously polls state handlers and processes transitions
         until stop() is called.
+
+        When a simulated time getter is configured, the FSM runs in lockstep
+        with the simulation - it waits for simulated time to advance by
+        poll_interval before executing the next handler.
         """
         self._running = True
         logger.info("FSM started in state: %s", self._state.name)
+
+        # Initialize last poll time
+        if self._simulated_time_getter is not None:
+            self._last_poll_simulated_time = self._simulated_time_getter()
 
         # Emit initial state enter event
         await self._emit_event(state_enter_event(self._state.name))
@@ -248,8 +280,9 @@ class AsyncFSM:
                     if next_state is not None and next_state != self._state:
                         await self.transition_to(next_state)
 
-                    # Wait before next poll (allows other tasks to run)
-                    await asyncio.sleep(self._poll_interval)
+                    # Wait for next poll interval
+                    await self._wait_for_next_poll()
+
                 except asyncio.CancelledError:
                     logger.info("FSM task cancelled")
                     break
@@ -269,12 +302,32 @@ class AsyncFSM:
             else:
                 # No handler for this state, just wait
                 try:
-                    await asyncio.sleep(self._poll_interval)
+                    await self._wait_for_next_poll()
                 except asyncio.CancelledError:
                     logger.info("FSM task cancelled during sleep")
                     break
 
         logger.info("FSM stopped")
+
+    async def _wait_for_next_poll(self) -> None:
+        """Wait until the next poll interval.
+
+        In lockstep mode (with simulated time), waits for simulated time
+        to advance by poll_interval. Otherwise uses wall-clock sleep.
+        """
+        if self._simulated_time_getter is not None:
+            # Lockstep mode: wait for simulated time to advance
+            target_time = self._last_poll_simulated_time + self._poll_interval
+            while self._running:
+                current_sim_time = self._simulated_time_getter()
+                if current_sim_time >= target_time:
+                    self._last_poll_simulated_time = current_sim_time
+                    break
+                # Brief sleep to allow simulation to advance
+                await asyncio.sleep(0.01)
+        else:
+            # Wall-clock mode
+            await asyncio.sleep(self._poll_interval)
 
     async def stop(self) -> None:
         """Stop the FSM.
