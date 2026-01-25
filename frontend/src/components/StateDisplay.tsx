@@ -13,6 +13,7 @@ interface StateDisplayProps {
 
 const STATE_COLORS: Record<IcemakerState, string> = {
   OFF: '#374151',
+  STANDBY: '#6b7280',
   IDLE: '#6b7280',
   POWER_ON: '#f59e0b',
   CHILL: '#3b82f6',
@@ -24,6 +25,7 @@ const STATE_COLORS: Record<IcemakerState, string> = {
 
 const STATE_DESCRIPTIONS: Record<IcemakerState, string> = {
   OFF: 'System powered off',
+  STANDBY: 'Powered on, initializing',
   IDLE: 'Ready, waiting for start',
   POWER_ON: 'Priming water system',
   CHILL: 'Cooling plate',
