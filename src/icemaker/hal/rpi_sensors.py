@@ -31,16 +31,37 @@ class RaspberryPiSensors(TemperatureSensorInterface):
             sensor_ids: Mapping of sensor names to their hardware IDs.
         """
         from w1thermsensor import W1ThermSensor
+        from w1thermsensor.errors import SensorNotReadyError, NoSensorFoundError
 
         for name, sensor_id in sensor_ids.items():
-            self._sensors[name] = W1ThermSensor(sensor_id=sensor_id)
-            logger.debug(
-                "Initialized sensor %s with ID %s",
-                name.value,
-                sensor_id,
-            )
+            try:
+                self._sensors[name] = W1ThermSensor(sensor_id=sensor_id)
+                logger.info(
+                    "Initialized sensor %s with ID %s",
+                    name.value,
+                    sensor_id,
+                )
+            except (SensorNotReadyError, NoSensorFoundError) as e:
+                logger.error(
+                    "Failed to initialize sensor %s (ID: %s): %s",
+                    name.value,
+                    sensor_id,
+                    e,
+                )
+                # Continue without this sensor - will raise on read
+            except Exception as e:
+                logger.error(
+                    "Unexpected error initializing sensor %s (ID: %s): %s",
+                    name.value,
+                    sensor_id,
+                    e,
+                )
 
-        logger.info("RaspberryPiSensors initialized with %d sensors", len(sensor_ids))
+        logger.info(
+            "RaspberryPiSensors initialized with %d/%d sensors",
+            len(self._sensors),
+            len(sensor_ids),
+        )
 
     async def read_temperature(self, sensor: SensorName) -> float:
         """Read temperature from a sensor.
@@ -52,24 +73,33 @@ class RaspberryPiSensors(TemperatureSensorInterface):
             sensor: The sensor to read.
 
         Returns:
-            Temperature in degrees Fahrenheit.
+            Temperature in degrees Fahrenheit, or 70.0 if read fails.
 
         Raises:
             ValueError: If sensor was not configured during setup.
         """
         from w1thermsensor import Unit
+        from w1thermsensor.errors import SensorNotReadyError, NoSensorFoundError
 
         sensor_obj = self._sensors.get(sensor)
         if sensor_obj is None:
-            raise ValueError(f"Unknown sensor: {sensor}")
+            logger.warning("Sensor %s not initialized, returning default temp", sensor.value)
+            return 70.0  # Return room temp as fallback
 
-        # Run blocking I/O in executor
-        loop = asyncio.get_event_loop()
-        temp = await loop.run_in_executor(
-            None,
-            lambda: sensor_obj.get_temperature(Unit.DEGREES_F),
-        )
-        return float(temp)
+        try:
+            # Run blocking I/O in executor
+            loop = asyncio.get_event_loop()
+            temp = await loop.run_in_executor(
+                None,
+                lambda: sensor_obj.get_temperature(Unit.DEGREES_F),
+            )
+            return float(temp)
+        except (SensorNotReadyError, NoSensorFoundError) as e:
+            logger.warning("Failed to read sensor %s: %s", sensor.value, e)
+            return 70.0  # Return room temp as fallback
+        except Exception as e:
+            logger.error("Unexpected error reading sensor %s: %s", sensor.value, e)
+            return 70.0
 
     async def read_all_temperatures(self) -> dict[SensorName, float]:
         """Read all sensor temperatures.

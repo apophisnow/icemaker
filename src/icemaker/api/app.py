@@ -195,14 +195,11 @@ def create_app() -> Quart:
     app = Quart(__name__)
 
     # CORS configuration for frontend
+    # Allow all origins - frontend may be accessed from various IPs
+    # (e.g., accessing Pi from local network)
     app = cors(
         app,
-        allow_origin=[
-            "http://localhost:5173",  # Vite dev server
-            "http://localhost:3000",  # Alternative dev port
-            "http://127.0.0.1:5173",
-            "http://127.0.0.1:3000",
-        ],
+        allow_origin="*",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
