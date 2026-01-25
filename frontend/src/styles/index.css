@@ -33,6 +33,7 @@ body {
 
 /* Dashboard Layout */
 .dashboard {
+  flex: 1;
   min-height: 100vh;
   padding: 1rem;
 }
