@@ -76,13 +76,19 @@ export function TemperatureChart({ data, targetTemp }: TemperatureChartProps) {
       : new Date(reading.timestamp).toLocaleTimeString(),
   }));
 
-  // Calculate Y-axis domain using converted temps
+  // Calculate Y-axis domain centered on freezing (32°F / 0°C)
+  const freezingPoint = unit === 'C' ? 0 : 32;
   const allTemps = data.flatMap((r) => [convertTemp(r.plate_temp_f), convertTemp(r.bin_temp_f)]);
   if (targetTemp !== null && targetTemp !== undefined) {
     allTemps.push(convertTemp(targetTemp));
   }
-  const minTemp = Math.min(...allTemps, unit === 'C' ? -18 : 0) - 5;
-  const maxTemp = Math.max(...allTemps, unit === 'C' ? 27 : 80) + 5;
+  // Find max distance from freezing point to ensure all data is visible
+  const maxDistanceFromFreezing = Math.max(
+    ...allTemps.map(t => Math.abs(t - freezingPoint)),
+    unit === 'C' ? 25 : 45  // Minimum range: ±25°C or ±45°F
+  );
+  const minTemp = freezingPoint - maxDistanceFromFreezing - 5;
+  const maxTemp = freezingPoint + maxDistanceFromFreezing + 5;
 
   // Convert target temp for display
   const displayTargetTemp = targetTemp !== null && targetTemp !== undefined
@@ -134,6 +140,13 @@ export function TemperatureChart({ data, targetTemp }: TemperatureChartProps) {
             strokeWidth={2}
             dot={false}
             isAnimationActive={false}
+          />
+          {/* Freezing point reference line */}
+          <ReferenceLine
+            y={freezingPoint}
+            stroke="#60a5fa"
+            strokeDasharray="3 3"
+            strokeOpacity={0.5}
           />
           {displayTargetTemp !== null && (
             <ReferenceLine
