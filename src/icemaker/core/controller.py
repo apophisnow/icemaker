@@ -646,6 +646,7 @@ class IcemakerController:
                 # Rechill complete - check bin and decide next action
                 ctx.chill_mode = None
                 ctx.cycle_count += 1
+                ctx.session_cycle_count += 1
                 self._save_cycle_count()
                 if self._is_bin_full():
                     logger.info("Bin full (temp %.1f°F < %.1f°F), entering IDLE to wait",
@@ -673,6 +674,7 @@ class IcemakerController:
             else:
                 ctx.chill_mode = None
                 ctx.cycle_count += 1
+                ctx.session_cycle_count += 1
                 self._save_cycle_count()
                 if self._is_bin_full():
                     return IcemakerState.IDLE

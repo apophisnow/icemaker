@@ -43,6 +43,7 @@ async def get_current_state():
         previous_state=fsm.previous_state.name if fsm.previous_state else None,
         state_enter_time=ctx.state_enter_time,
         cycle_count=ctx.cycle_count,
+        session_cycle_count=ctx.session_cycle_count,
         plate_temp=ctx.plate_temp,
         bin_temp=ctx.bin_temp,
         target_temp=ctx.target_temp,

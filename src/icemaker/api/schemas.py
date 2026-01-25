@@ -13,7 +13,8 @@ class StateResponse:
 
     state: str
     state_enter_time: datetime
-    cycle_count: int
+    cycle_count: int  # Lifetime cycle count
+    session_cycle_count: int  # Session cycle count (since server start)
     plate_temp: float
     bin_temp: float
     time_in_state_seconds: float

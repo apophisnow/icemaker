@@ -31,7 +31,8 @@ class FSMContext:
         plate_temp: Current plate temperature in Fahrenheit.
         bin_temp: Current ice bin temperature in Fahrenheit.
         target_temp: Current target temperature for the active state.
-        cycle_count: Number of completed ice-making cycles.
+        cycle_count: Lifetime cycle count (persists across restarts).
+        session_cycle_count: Session cycle count (resets on server restart).
         state_enter_time: When the current state was entered (wall clock).
         cycle_start_time: When the current cycle started.
         chill_mode: Current chill mode (PRECHILL or RECHILL).
@@ -41,7 +42,8 @@ class FSMContext:
     plate_temp: float = 70.0
     bin_temp: float = 70.0
     target_temp: float = 32.0
-    cycle_count: int = 0
+    cycle_count: int = 0  # Lifetime count (loaded from file)
+    session_cycle_count: int = 0  # Session count (resets on restart)
     state_enter_time: datetime = field(default_factory=datetime.now)
     cycle_start_time: Optional[datetime] = None
     chill_mode: Optional[str] = None  # "prechill" or "rechill"

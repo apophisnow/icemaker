@@ -36,7 +36,8 @@ export interface IcemakerStatus {
   state: IcemakerState;
   previous_state: IcemakerState | null;
   state_enter_time: string;
-  cycle_count: number;
+  cycle_count: number;  // Lifetime cycle count
+  session_cycle_count: number;  // Session cycle count (since server start)
   plate_temp: number;
   bin_temp: number;
   water_temp?: number;
@@ -72,6 +73,7 @@ export interface StateUpdateData {
   bin_temp: number;
   target_temp: number | null;
   cycle_count: number;
+  session_cycle_count: number;
   time_in_state_seconds: number;
   chill_mode: string | null;
 }

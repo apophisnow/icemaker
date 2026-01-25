@@ -10,7 +10,7 @@ states:
     timeout_seconds: 120    # timeout=2*MIN (2 minutes)
 
   ice_making:
-    target_temp: -2.0       # ice_target_temp=-2 in ice_making call
+    target_temp: -1.0       # ice_target_temp=-2 in ice_making call
     timeout_seconds: 1500   # timeout=25*MIN (25 minutes)
 
   harvest:

@@ -102,6 +102,7 @@ class WebSocketManager:
         bin_temp: float,
         target_temp: float | None,
         cycle_count: int,
+        session_cycle_count: int,
         time_in_state: float,
         chill_mode: str | None = None,
     ) -> None:
@@ -113,7 +114,8 @@ class WebSocketManager:
             plate_temp: Current plate temperature.
             bin_temp: Current bin temperature.
             target_temp: Target temperature for current state.
-            cycle_count: Number of completed cycles.
+            cycle_count: Lifetime cycle count.
+            session_cycle_count: Session cycle count (since server start).
             time_in_state: Seconds in current state.
             chill_mode: Current chill mode if in CHILL state.
         """
@@ -124,6 +126,7 @@ class WebSocketManager:
             "bin_temp": bin_temp,
             "target_temp": target_temp,
             "cycle_count": cycle_count,
+            "session_cycle_count": session_cycle_count,
             "time_in_state_seconds": time_in_state,
             "chill_mode": chill_mode,
         })

@@ -2,16 +2,13 @@
  * Main dashboard component.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useIcemakerState } from '../hooks/useIcemakerState';
 import { useTemperature } from '../contexts/TemperatureContext';
 import { useDataLogger } from '../contexts/DataLoggerContext';
-import { Configuration } from './Configuration';
-import { Controls } from './Controls';
 import { DataLogger } from './DataLogger';
-import { RelayStatus } from './RelayStatus';
-import { StateDisplay } from './StateDisplay';
-import { SystemDiagram } from './SystemDiagram';
+import { MainPanel } from './MainPanel';
+import { SettingsPanel } from './SettingsPanel';
 import { TemperatureChart } from './TemperatureChart';
 
 export function Dashboard() {
@@ -27,6 +24,7 @@ export function Dashboard() {
   } = useIcemakerState();
   const { unit, toggleUnit } = useTemperature();
   const { logData, isLogging } = useDataLogger();
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // Log data when status updates and logging is active
   useEffect(() => {
@@ -50,20 +48,26 @@ export function Dashboard() {
   return (
     <div className="dashboard">
       <header className="dashboard-header">
-        <h1>Icemaker Control Panel</h1>
-        <div className="header-status">
+        <h1>Icemaker</h1>
+        <div className="header-actions">
           <button
-            className="unit-toggle"
+            className="header-btn"
             onClick={toggleUnit}
             title="Toggle temperature unit"
           >
             °{unit}
           </button>
+          <button
+            className="header-btn"
+            onClick={() => setSettingsOpen(true)}
+            title="Settings"
+          >
+            ⚙
+          </button>
           <div
             className={`connection-status ${isConnected ? 'connected' : 'disconnected'}`}
           >
             <span className="status-dot" />
-            {isConnected ? 'Connected' : 'Disconnected'}
           </div>
         </div>
       </header>
@@ -71,52 +75,34 @@ export function Dashboard() {
       {error && (
         <div className="error-banner">
           <span>{error}</span>
-          <button onClick={clearError}>Dismiss</button>
+          <button onClick={clearError}>×</button>
         </div>
       )}
 
-      <div className="dashboard-grid">
-        <section className="state-section">
-          <StateDisplay status={status} />
-        </section>
+      <div className="dashboard-layout">
+        <aside className="sidebar">
+          <MainPanel
+            status={status}
+            relays={relays}
+            simulatedTimeInState={status?.time_in_state_seconds}
+          />
+          <DataLogger />
+        </aside>
 
-        <section className="chart-section">
+        <main className="main-content">
           <TemperatureChart
             data={temperatureHistory}
             targetTemp={status?.target_temp}
           />
-        </section>
-
-        <section className="relay-section">
-          <RelayStatus relays={relays} />
-        </section>
-
-        <section className="diagram-section">
-          <SystemDiagram
-            relays={relays}
-            plateTemp={status?.plate_temp ?? null}
-            binTemp={status?.bin_temp ?? null}
-            waterTemp={status?.water_temp ?? null}
-            state={status?.state ?? null}
-          />
-        </section>
-
-        <section className="controls-section">
-          <Controls
-            currentState={status?.state}
-            onError={() => clearError()}
-            onRefresh={refresh}
-          />
-        </section>
-
-        <section className="logger-section">
-          <DataLogger />
-        </section>
-
-        <section className="config-section">
-          <Configuration />
-        </section>
+        </main>
       </div>
+
+      <SettingsPanel
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        currentState={status?.state}
+        onRefresh={refresh}
+      />
     </div>
   );
 }

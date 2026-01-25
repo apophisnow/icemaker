@@ -77,6 +77,7 @@ async def _event_handler(event: Event) -> None:
             bin_temp=ctx.bin_temp,
             target_temp=ctx.target_temp,
             cycle_count=ctx.cycle_count,
+            session_cycle_count=ctx.session_cycle_count,
             time_in_state=fsm.time_in_state(),
             chill_mode=ctx.chill_mode,
         )

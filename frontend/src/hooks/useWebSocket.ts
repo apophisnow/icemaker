@@ -9,7 +9,6 @@ interface UseWebSocketOptions {
   url: string;
   onMessage?: (message: WebSocketMessage) => void;
   reconnectInterval?: number;
-  maxRetries?: number;
 }
 
 interface UseWebSocketReturn {
@@ -22,13 +21,11 @@ interface UseWebSocketReturn {
 export function useWebSocket({
   url,
   onMessage,
-  reconnectInterval = 3000,
-  maxRetries = 10,
+  reconnectInterval = 5000,
 }: UseWebSocketOptions): UseWebSocketReturn {
   const [isConnected, setIsConnected] = useState(false);
   const [lastMessage, setLastMessage] = useState<WebSocketMessage | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const retriesRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const connect = useCallback(() => {
@@ -38,18 +35,15 @@ export function useWebSocket({
 
     ws.onopen = () => {
       setIsConnected(true);
-      retriesRef.current = 0;
       console.log('WebSocket connected');
     };
 
     ws.onclose = () => {
       setIsConnected(false);
-      console.log('WebSocket disconnected');
+      console.log('WebSocket disconnected, reconnecting in 5s...');
 
-      if (retriesRef.current < maxRetries) {
-        retriesRef.current++;
-        reconnectTimeoutRef.current = setTimeout(connect, reconnectInterval);
-      }
+      // Always retry reconnection
+      reconnectTimeoutRef.current = setTimeout(connect, reconnectInterval);
     };
 
     ws.onerror = (error) => {
@@ -67,7 +61,7 @@ export function useWebSocket({
     };
 
     wsRef.current = ws;
-  }, [url, onMessage, reconnectInterval, maxRetries]);
+  }, [url, onMessage, reconnectInterval]);
 
   const send = useCallback((data: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -76,8 +70,8 @@ export function useWebSocket({
   }, []);
 
   const reconnect = useCallback(() => {
+    clearTimeout(reconnectTimeoutRef.current);
     wsRef.current?.close();
-    retriesRef.current = 0;
     connect();
   }, [connect]);
 

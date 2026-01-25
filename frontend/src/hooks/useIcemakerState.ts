@@ -54,6 +54,7 @@ export function useIcemakerState() {
                 bin_temp: data.bin_temp,
                 target_temp: data.target_temp,
                 cycle_count: data.cycle_count,
+                session_cycle_count: data.session_cycle_count,
                 time_in_state_seconds: data.time_in_state_seconds,
                 chill_mode: data.chill_mode,
               }

@@ -1476,46 +1476,539 @@ body {
   color: var(--text-muted);
 }
 
+/* ============================================
+   New Dashboard Layout
+   ============================================ */
+
+.dashboard-layout {
+  display: flex;
+  gap: 1rem;
+  height: calc(100vh - 100px);
+}
+
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow-y: auto;
+}
+
+.main-content {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 1rem;
+  overflow: hidden;
+}
+
+/* Header Actions */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.header-btn:hover {
+  background: #4b5563;
+  border-color: var(--accent-blue);
+}
+
+/* Main Panel */
+.main-panel {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.main-panel .panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+}
+
+.main-panel .state-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+}
+
+.main-panel .state-badge.chill { background: var(--accent-cyan); color: #fff; }
+.main-panel .state-badge.ice { background: var(--accent-blue); color: #fff; }
+.main-panel .state-badge.heat { background: var(--accent-red); color: #fff; }
+.main-panel .state-badge.idle { background: var(--accent-yellow); color: #000; }
+.main-panel .state-badge.standby { background: var(--text-muted); color: #fff; }
+.main-panel .state-badge.off { background: #333; color: #666; }
+.main-panel .state-badge.power_on { background: var(--accent-yellow); color: #000; }
+.main-panel .state-badge.error { background: var(--accent-red); color: #fff; }
+
+.main-panel .panel-body {
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.main-panel .status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+}
+
+.main-panel .status-description {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.main-panel .status-time {
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: monospace;
+  color: var(--text-primary);
+}
+
+.main-panel .stats-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.main-panel .stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+}
+
+.main-panel .stat-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.main-panel .stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* Re-use temp-row and component styles from system-diagram-compact */
+.main-panel .temp-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.main-panel .temp-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+.main-panel .temp-box.cooling {
+  border-color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.main-panel .temp-box.heating {
+  border-color: var(--accent-red);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.main-panel .temp-box.water {
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.main-panel .temp-box.target {
+  border-color: var(--accent-yellow);
+  background: rgba(245, 158, 11, 0.1);
+}
+
+.main-panel .temp-label {
+  font-size: 0.55rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.main-panel .temp-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.main-panel .temp-box.cooling .temp-value { color: var(--accent-cyan); }
+.main-panel .temp-box.heating .temp-value { color: var(--accent-red); }
+.main-panel .temp-box.target .temp-value { color: var(--accent-yellow); }
+
+.main-panel .component-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.main-panel .group-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.main-panel .component-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.35rem;
+}
+
+.main-panel .indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.4rem;
+  background: var(--bg-primary);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.main-panel .indicator.active {
+  border-color: var(--accent-green);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+.main-panel .indicator.active.cool {
+  border-color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.1);
+}
+
+.main-panel .indicator.active.heat {
+  border-color: var(--accent-red);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.main-panel .indicator.active.water {
+  border-color: var(--accent-blue);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.main-panel .indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.main-panel .indicator.active .indicator-dot {
+  background: var(--accent-green);
+  box-shadow: 0 0 4px var(--accent-green);
+}
+
+.main-panel .indicator.active.cool .indicator-dot {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 4px var(--accent-cyan);
+}
+
+.main-panel .indicator.active.heat .indicator-dot {
+  background: var(--accent-red);
+  box-shadow: 0 0 4px var(--accent-red);
+}
+
+.main-panel .indicator.active.water .indicator-dot {
+  background: var(--accent-blue);
+  box-shadow: 0 0 4px var(--accent-blue);
+}
+
+.main-panel .indicator-label {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.main-panel .indicator.active .indicator-label {
+  color: var(--text-primary);
+}
+
+.main-panel .visual-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+}
+
+.main-panel .plate-icon-compact {
+  font-size: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.main-panel .plate-icon-compact.cooling {
+  filter: drop-shadow(0 0 6px var(--accent-cyan));
+}
+
+.main-panel .plate-icon-compact.heating {
+  filter: drop-shadow(0 0 6px var(--accent-red));
+}
+
+.main-panel .flow-arrow {
+  font-size: 1.2rem;
+  color: var(--text-muted);
+  transition: all 0.3s ease;
+}
+
+.main-panel .flow-arrow.active {
+  color: var(--accent-blue);
+  animation: flow-bounce 1s ease-in-out infinite;
+}
+
+.main-panel .bin-icon-compact {
+  font-size: 1.5rem;
+}
+
+.main-panel .loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ============================================
+   Settings Panel (Slide-in)
+   ============================================ */
+
+.settings-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  z-index: 100;
+}
+
+.settings-backdrop.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.settings-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 350px;
+  max-width: 90vw;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border-color);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.settings-panel.open {
+  transform: translateX(0);
+}
+
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.settings-header h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.settings-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.settings-section {
+  margin-bottom: 1.5rem;
+}
+
+.settings-section h3 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--text-primary);
+}
+
+.settings-error {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--accent-red);
+  border-radius: 6px;
+  color: var(--accent-red);
+  font-size: 0.8rem;
+}
+
+.settings-error button {
+  background: transparent;
+  border: none;
+  color: var(--accent-red);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.settings-section .control-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-success {
+  background: var(--accent-green);
+  color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+  background: #059669;
+}
+
+.btn-warning {
+  background: var(--accent-yellow);
+  color: #000;
+}
+
+.btn-warning:hover:not(:disabled) {
+  background: #d97706;
+}
+
+.control-hint {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+/* Data Logger in sidebar */
+.sidebar .data-logger {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  padding: 0.75rem;
+}
+
+.sidebar .data-logger h3 {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+}
+
 /* Responsive */
-@media (max-width: 768px) {
-  .dashboard-grid {
-    grid-template-columns: 1fr;
+@media (max-width: 900px) {
+  .dashboard-layout {
+    flex-direction: column;
+    height: auto;
   }
 
-  .state-details {
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .relay-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .config-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .diagram-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-  }
-
-  .diagram-section.refrigeration,
-  .diagram-section.ice-making,
-  .diagram-section.ice-bin,
-  .diagram-section.status {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
-  .flow-indicator,
-  .flow-indicator.vertical,
-  .ice-drop-zone {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
-  .diagram-legend {
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
     flex-wrap: wrap;
-    gap: 1rem;
+  }
+
+  .sidebar > * {
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .main-content {
+    min-height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-header h1 {
+    font-size: 1.1rem;
+  }
+
+  .settings-panel {
+    width: 100%;
+  }
+
+  .main-panel .component-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
