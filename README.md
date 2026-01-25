@@ -37,25 +37,41 @@ Industrial icemaker control system with async FSM, physics-based simulation, and
 
 ### Prerequisites
 
-- Python 3.10+
-- Node.js 18+
+- Python 3.9+
+- Node.js 18+ (for frontend development)
 - [uv](https://github.com/astral-sh/uv) (recommended) or pip
 
-### Installation
+### Automated Setup
+
+The easiest way to get started is using the setup script:
 
 ```bash
 # Clone the repository
 git clone <repo-url>
 cd icemaker
 
-# Install Python dependencies
-uv add fastapi uvicorn websockets pydantic pyyaml pytest pytest-asyncio httpx
-
-# Install frontend dependencies
-cd frontend && npm install && cd ..
+# Run setup (auto-detects platform)
+./setup.sh
 ```
 
-### Running with Simulator
+The setup script will:
+- Detect if running on Raspberry Pi or development machine
+- Install uv if not present (or fall back to pip)
+- Install appropriate dependencies (including RPi.GPIO on Pi)
+- Create `.env` with correct environment settings
+
+### Running the Application
+
+```bash
+# With uv (recommended)
+uv run python -m icemaker
+
+# Or with virtual environment
+source .venv/bin/activate
+python -m icemaker
+```
+
+### Running with Simulator (Development)
 
 ```bash
 # Terminal 1: Start backend with simulator
@@ -67,23 +83,63 @@ cd frontend && npm run dev
 
 Open http://localhost:5173 to view the dashboard.
 
-### Running on Raspberry Pi
+## Raspberry Pi Deployment
+
+### Quick Deploy
 
 ```bash
-# Install Raspberry Pi dependencies
-uv add RPi.GPIO w1thermsensor
+git clone <repo-url> icemaker
+cd icemaker
+./setup.sh --service
+```
 
-# Start without simulator (uses real hardware)
-uv run python -m icemaker
+This installs dependencies and sets up a systemd service that starts on boot.
+
+### Service Management
+
+```bash
+sudo systemctl start icemaker    # Start the service
+sudo systemctl stop icemaker     # Stop the service
+sudo systemctl status icemaker   # Check status
+journalctl -u icemaker -f        # View logs
+```
+
+### First-Time Setup (with Priming)
+
+By default, the water priming sequence is skipped on startup (assumes the system is already primed). To run the priming sequence on first boot:
+
+```bash
+# One-time priming
+ICEMAKER_SKIP_PRIMING=false uv run python -m icemaker
+
+# Or set in config/production.yaml:
+# startup:
+#   skip_priming: false
+```
+
+### Manual Installation (without setup script)
+
+```bash
+# Upgrade pip and install
+pip install --upgrade pip
+pip install ".[rpi]"
+
+# Set environment
+export ICEMAKER_ENV=production
+
+# Run
+python -m icemaker
 ```
 
 ## Project Structure
 
 ```
 icemaker/
-├── config/                 # YAML configuration files
+├── setup.sh               # Automated setup script
+├── config/                # YAML configuration files
 │   ├── default.yaml       # Default settings
-│   └── development.yaml   # Dev environment (faster timeouts)
+│   ├── development.yaml   # Dev environment (simulator enabled)
+│   └── production.yaml    # Production settings (real hardware)
 ├── src/icemaker/
 │   ├── core/              # FSM, states, events, controller
 │   ├── hal/               # Hardware abstraction layer
@@ -97,27 +153,42 @@ icemaker/
 
 ## Ice-Making Cycle
 
-The system follows this cycle:
+The system follows this state flow:
 
-1. **IDLE** - Waiting for start command
-2. **CHILL** (prechill) - Cool plate to 32°F
-3. **ICE** - Make ice at -2°F with water recirculation
-4. **HEAT** - Harvest ice by heating plate to 38°F
-5. **CHILL** (rechill) - Cool to 35°F before next cycle
-6. Check bin → if full, return to IDLE; otherwise repeat
+### Startup
+1. **OFF** - System powered off (initial state)
+2. **POWER_ON** - Water priming sequence (optional, skipped by default)
+3. **STANDBY** - Ready, waiting for manual start
+
+### Ice-Making Loop
+4. **CHILL** (prechill) - Cool plate to 32°F
+5. **ICE** - Make ice at -2°F with water recirculation
+6. **HEAT** - Harvest ice by heating plate to 38°F
+7. **CHILL** (rechill) - Cool to 35°F before next cycle
+8. Check bin:
+   - If full → **IDLE** (auto-restarts when bin empties)
+   - If not full → repeat from step 4
 
 ## Configuration
 
 Configuration is loaded from YAML files with environment variable overrides:
 
-| Environment Variable | Description |
-|---------------------|-------------|
-| `ICEMAKER_ENV` | Config environment (development/production) |
-| `ICEMAKER_USE_SIMULATOR` | Enable thermal simulator |
-| `ICEMAKER_PRECHILL_TEMP` | Prechill target temperature |
-| `ICEMAKER_ICE_TEMP` | Ice-making target temperature |
-| `ICEMAKER_HARVEST_TEMP` | Harvest threshold temperature |
-| `ICEMAKER_BIN_THRESHOLD` | Bin full detection threshold |
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `ICEMAKER_ENV` | Config environment (development/production) | development |
+| `ICEMAKER_USE_SIMULATOR` | Enable thermal simulator | false |
+| `ICEMAKER_SKIP_PRIMING` | Skip water priming on startup | true |
+| `ICEMAKER_PRECHILL_TEMP` | Prechill target temperature (°F) | 32.0 |
+| `ICEMAKER_ICE_TEMP` | Ice-making target temperature (°F) | -2.0 |
+| `ICEMAKER_HARVEST_TEMP` | Harvest threshold temperature (°F) | 38.0 |
+| `ICEMAKER_RECHILL_TEMP` | Rechill target temperature (°F) | 35.0 |
+| `ICEMAKER_BIN_THRESHOLD` | Bin full detection threshold (°F) | 35.0 |
+
+### Configuration Files
+
+- `config/default.yaml` - Base defaults
+- `config/development.yaml` - Development settings (simulator enabled)
+- `config/production.yaml` - Production settings (matches hardware values)
 
 ## API Endpoints
 

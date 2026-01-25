@@ -1,0 +1,35 @@
+# Production Configuration
+# Values match mark_icemaker2.py reference implementation
+
+log_level: INFO
+poll_interval: 5.0
+
+states:
+  prechill:
+    target_temp: 32.0       # target_temp=32 in chill_plate call
+    timeout_seconds: 120    # timeout=2*MIN (2 minutes)
+
+  ice_making:
+    target_temp: -2.0       # ice_target_temp=-2 in ice_making call
+    timeout_seconds: 1500   # timeout=25*MIN (25 minutes)
+
+  harvest:
+    target_temp: 38.0       # harvest_threshold=38 in harvest call
+    timeout_seconds: 240    # timeout=4*MIN (4 minutes)
+
+  rechill:
+    target_temp: 35.0       # target_temp=35 in post-harvest chill_plate call
+    timeout_seconds: 300    # timeout=5*MIN (5 minutes)
+
+thresholds:
+  bin_full: 35.0            # threshold=35 in bin_full function
+
+hardware:
+  plate_sensor_id: "092101487373"   # plate_temp_sensor_id
+  bin_sensor_id: "3c01f0956abd"     # ice_bin_temp_sensor_id
+
+startup:
+  skip_priming: true        # Skip priming by default (system already primed)
+
+simulation:
+  enabled: false
