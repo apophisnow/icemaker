@@ -2,9 +2,11 @@
  * Data logging controls for recording and exporting data.
  */
 
+import { useState } from 'react';
 import { useDataLogger } from '../contexts/DataLoggerContext';
 
 export function DataLogger() {
+  const [isExpanded, setIsExpanded] = useState(false);
   const {
     isLogging,
     entryCount,
@@ -15,50 +17,58 @@ export function DataLogger() {
   } = useDataLogger();
 
   return (
-    <div className="data-logger">
-      <h3>Data Logger</h3>
-
-      <div className="logger-status">
-        <span className={`logger-indicator ${isLogging ? 'recording' : ''}`} />
-        <span className="logger-text">
-          {isLogging ? 'Recording' : 'Stopped'}
+    <div className={`data-logger ${isExpanded ? 'expanded' : 'collapsed'}`}>
+      <button
+        className="logger-header"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <span className="logger-title">
+          <span className={`logger-indicator ${isLogging ? 'recording' : ''}`} />
+          Data Logger
+          {entryCount > 0 && (
+            <span className="entry-count">{entryCount}</span>
+          )}
         </span>
-        {entryCount > 0 && (
-          <span className="entry-count">{entryCount} entries</span>
-        )}
-      </div>
+        <span className={`expand-icon ${isExpanded ? 'open' : ''}`}>▼</span>
+      </button>
 
-      <div className="logger-controls">
-        {!isLogging ? (
-          <button className="btn btn-primary" onClick={startLogging}>
-            Start Recording
-          </button>
-        ) : (
-          <button className="btn btn-danger" onClick={stopLogging}>
-            Stop Recording
-          </button>
-        )}
+      {isExpanded && (
+        <div className="logger-content">
+          <div className="logger-status">
+            <span className="logger-text">
+              {isLogging ? 'Recording...' : 'Stopped'}
+            </span>
+          </div>
 
-        <button
-          className="btn btn-secondary"
-          onClick={downloadLog}
-          disabled={entryCount === 0}
-        >
-          Download CSV
-        </button>
+          <div className="logger-controls">
+            {!isLogging ? (
+              <button className="btn btn-primary" onClick={startLogging}>
+                Start
+              </button>
+            ) : (
+              <button className="btn btn-danger" onClick={stopLogging}>
+                Stop
+              </button>
+            )}
 
-        <button
-          className="btn btn-secondary"
-          onClick={clearLog}
-          disabled={entryCount === 0 || isLogging}
-        >
-          Clear
-        </button>
-      </div>
+            <button
+              className="btn btn-secondary"
+              onClick={downloadLog}
+              disabled={entryCount === 0}
+            >
+              Download
+            </button>
 
-      <p className="logger-info">
-        Records temperature, state, and relay data to a CSV file.
-      </p>
+            <button
+              className="btn btn-secondary"
+              onClick={clearLog}
+              disabled={entryCount === 0 || isLogging}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

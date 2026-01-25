@@ -35,9 +35,10 @@ body {
 .dashboard {
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
   height: 100vh;
   padding: 1rem;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
 }
 
@@ -344,34 +345,38 @@ body {
   color: var(--text-secondary);
 }
 
-/* Data Logger */
-.data-logger h3 {
-  margin-bottom: 1rem;
-  font-size: 1rem;
+/* Data Logger - Collapsible */
+.data-logger .logger-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 0.85rem;
   font-weight: 600;
 }
 
-.logger-status {
+.data-logger .logger-title {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 1rem;
-  padding: 0.75rem;
-  background: var(--bg-tertiary);
-  border-radius: 6px;
 }
 
-.logger-indicator {
-  width: 10px;
-  height: 10px;
+.data-logger .logger-indicator {
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   background: var(--text-muted);
   flex-shrink: 0;
 }
 
-.logger-indicator.recording {
+.data-logger .logger-indicator.recording {
   background: var(--accent-red);
-  box-shadow: 0 0 8px var(--accent-red);
+  box-shadow: 0 0 6px var(--accent-red);
   animation: pulse 1.5s ease-in-out infinite;
 }
 
@@ -380,35 +385,46 @@ body {
   50% { opacity: 0.5; }
 }
 
-.logger-text {
-  font-size: 0.875rem;
+.data-logger .entry-count {
+  font-size: 0.65rem;
   font-weight: 500;
-}
-
-.entry-count {
-  margin-left: auto;
-  font-size: 0.75rem;
   color: var(--text-secondary);
   background: var(--bg-primary);
-  padding: 0.25rem 0.5rem;
+  padding: 0.15rem 0.4rem;
   border-radius: 4px;
 }
 
-.logger-controls {
-  display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+.data-logger .expand-icon {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
 }
 
-.logger-controls .btn {
-  flex: 1;
-  padding: 0.5rem;
-  font-size: 0.875rem;
+.data-logger .expand-icon.open {
+  transform: rotate(180deg);
 }
 
-.logger-info {
+.data-logger .logger-content {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.data-logger .logger-status {
   font-size: 0.75rem;
   color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.data-logger .logger-controls {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.data-logger .logger-controls .btn {
+  flex: 1;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.75rem;
 }
 
 /* Configuration */
@@ -1471,18 +1487,15 @@ body {
 .dashboard-grid {
   display: grid;
   grid-template-columns: 300px 1fr;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
   gap: 1rem;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
 }
 
 .dashboard-grid > .main-panel {
   grid-column: 1;
   grid-row: 1;
-  overflow-y: auto;
-  min-height: 0;
 }
 
 .dashboard-grid > .data-logger {
@@ -1492,12 +1505,6 @@ body {
   border-radius: 8px;
   border: 1px solid var(--border-color);
   padding: 0.75rem;
-  flex-shrink: 0;
-}
-
-.dashboard-grid > .data-logger h3 {
-  font-size: 0.85rem;
-  margin-bottom: 0.5rem;
 }
 
 .dashboard-grid > .chart-card {
@@ -1508,17 +1515,15 @@ body {
   border: 1px solid var(--border-color);
   padding: 1rem;
   min-width: 0;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
 }
 
 .chart-card .temperature-chart {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: 300px;
 }
 
 .chart-card .temperature-chart h3 {
@@ -1528,7 +1533,6 @@ body {
 
 .chart-card .temperature-chart .recharts-responsive-container {
   flex: 1;
-  min-height: 0;
 }
 
 /* Header Actions */
