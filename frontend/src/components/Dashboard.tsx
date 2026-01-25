@@ -79,22 +79,19 @@ export function Dashboard() {
         </div>
       )}
 
-      <div className="dashboard-layout">
-        <aside className="sidebar">
-          <MainPanel
-            status={status}
-            relays={relays}
-            simulatedTimeInState={status?.time_in_state_seconds}
-          />
-          <DataLogger />
-        </aside>
-
-        <main className="main-content">
+      <div className="dashboard-grid">
+        <MainPanel
+          status={status}
+          relays={relays}
+          simulatedTimeInState={status?.time_in_state_seconds}
+        />
+        <DataLogger />
+        <div className="chart-card">
           <TemperatureChart
             data={temperatureHistory}
             targetTemp={status?.target_temp}
           />
-        </main>
+        </div>
       </div>
 
       <SettingsPanel
