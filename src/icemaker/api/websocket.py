@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
-from fastapi import WebSocket
+from quart import Websocket
 
 from .schemas import WebSocketMessage
 
@@ -22,7 +24,7 @@ class WebSocketManager:
     """
 
     def __init__(self) -> None:
-        self._connections: list[WebSocket] = []
+        self._connections: list[Websocket] = []
         self._lock = asyncio.Lock()
 
     @property
@@ -30,13 +32,12 @@ class WebSocketManager:
         """Number of active WebSocket connections."""
         return len(self._connections)
 
-    async def connect(self, websocket: WebSocket) -> None:
-        """Accept and register a new WebSocket connection.
+    async def connect(self, websocket: Websocket) -> None:
+        """Register a new WebSocket connection.
 
         Args:
-            websocket: The WebSocket connection to accept.
+            websocket: The WebSocket connection to register.
         """
-        await websocket.accept()
         async with self._lock:
             self._connections.append(websocket)
         logger.info(
@@ -44,7 +45,7 @@ class WebSocketManager:
             len(self._connections),
         )
 
-    async def disconnect(self, websocket: WebSocket) -> None:
+    async def disconnect(self, websocket: Websocket) -> None:
         """Remove a WebSocket connection.
 
         Args:
@@ -76,13 +77,16 @@ class WebSocketManager:
             timestamp=datetime.now(),
         )
 
-        json_message = message.model_dump_json()
+        # Convert dataclass to JSON, handling datetime serialization
+        message_dict = asdict(message)
+        message_dict["timestamp"] = message_dict["timestamp"].isoformat()
+        json_message = json.dumps(message_dict)
 
         async with self._lock:
-            disconnected: list[WebSocket] = []
+            disconnected: list[Websocket] = []
             for connection in self._connections:
                 try:
-                    await connection.send_text(json_message)
+                    await connection.send(json_message)
                 except Exception as e:
                     logger.warning("Failed to send to WebSocket: %s", e)
                     disconnected.append(connection)

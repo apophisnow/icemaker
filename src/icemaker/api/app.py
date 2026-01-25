@@ -1,21 +1,19 @@
-"""FastAPI application for icemaker control."""
+"""Quart application for icemaker control."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Optional
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from quart import Quart
+from quart_cors import cors
 
 from ..config import load_config
 from ..core.controller import IcemakerController
-from ..core.events import Event, EventType, temp_reading_event
+from ..core.events import Event, EventType
 from ..hal.base import SensorName
-from .routes import config, relays, sensors, simulator, state
 from .websocket import WebSocketManager
 
 logger = logging.getLogger(__name__)
@@ -191,66 +189,14 @@ async def _shutdown_tasks() -> None:
     logger.info("Icemaker API shutdown complete")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan management."""
-    global app_state
+def create_app() -> Quart:
+    """Create and configure the Quart application."""
+    app = Quart(__name__)
 
-    # Reset shutdown event for fresh start
-    app_state._shutdown_event = asyncio.Event()
-
-    # Startup
-    logger.info("Starting icemaker API")
-
-    # Load configuration
-    cfg = load_config()
-
-    # Create controller (but don't initialize hardware yet)
-    app_state.controller = IcemakerController(config=cfg)
-    app_state.controller.add_event_listener(_event_handler)
-
-    logger.info("Icemaker API ready, initializing hardware...")
-
-    # Initialize hardware (HAL setup)
-    await app_state.controller.initialize()
-
-    # Start thermal model if using simulator
-    if app_state.controller._thermal_model is not None:
-        await app_state.controller._thermal_model.start()
-
-    # Start FSM in background task
-    app_state._controller_task = asyncio.create_task(
-        app_state.controller.fsm.run(),
-        name="fsm-controller",
-    )
-
-    # Start sensor polling in background task
-    app_state._sensor_task = asyncio.create_task(
-        _poll_sensors_loop(),
-        name="sensor-polling",
-    )
-
-    logger.info("Icemaker API started")
-
-    try:
-        yield
-    finally:
-        await _shutdown_tasks()
-
-
-def create_app() -> FastAPI:
-    """Create and configure the FastAPI application."""
-    app = FastAPI(
-        title="Icemaker Control API",
-        description="Real-time icemaker control and monitoring",
-        version="1.0.0",
-        lifespan=lifespan,
-    )
-
-    # CORS middleware for frontend
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
+    # CORS configuration for frontend
+    app = cors(
+        app,
+        allow_origin=[
             "http://localhost:5173",  # Vite dev server
             "http://localhost:3000",  # Alternative dev port
             "http://127.0.0.1:5173",
@@ -261,14 +207,53 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # Include route modules
-    app.include_router(state.router, prefix="/api/state", tags=["State"])
-    app.include_router(config.router, prefix="/api/config", tags=["Configuration"])
-    app.include_router(relays.router, prefix="/api/relays", tags=["Relays"])
-    app.include_router(sensors.router, prefix="/api/sensors", tags=["Sensors"])
-    app.include_router(simulator.router, prefix="/api/simulator", tags=["Simulator"])
+    @app.before_serving
+    async def startup() -> None:
+        """Application startup."""
+        global app_state
 
-    @app.get("/health")
+        # Reset shutdown event for fresh start
+        app_state._shutdown_event = asyncio.Event()
+
+        # Startup
+        logger.info("Starting icemaker API")
+
+        # Load configuration
+        cfg = load_config()
+
+        # Create controller (but don't initialize hardware yet)
+        app_state.controller = IcemakerController(config=cfg)
+        app_state.controller.add_event_listener(_event_handler)
+
+        logger.info("Icemaker API ready, initializing hardware...")
+
+        # Initialize hardware (HAL setup)
+        await app_state.controller.initialize()
+
+        # Start thermal model if using simulator
+        if app_state.controller._thermal_model is not None:
+            await app_state.controller._thermal_model.start()
+
+        # Start FSM in background task
+        app_state._controller_task = asyncio.create_task(
+            app_state.controller.fsm.run(),
+            name="fsm-controller",
+        )
+
+        # Start sensor polling in background task
+        app_state._sensor_task = asyncio.create_task(
+            _poll_sensors_loop(),
+            name="sensor-polling",
+        )
+
+        logger.info("Icemaker API started")
+
+    @app.after_serving
+    async def shutdown() -> None:
+        """Application shutdown."""
+        await _shutdown_tasks()
+
+    @app.route("/health")
     async def health_check():
         """Health check endpoint."""
         return {
@@ -276,6 +261,15 @@ def create_app() -> FastAPI:
             "controller_running": app_state.controller is not None,
             "websocket_connections": app_state.ws_manager.connection_count,
         }
+
+    # Register blueprints
+    from .routes import config, relays, sensors, simulator, state
+
+    app.register_blueprint(state.bp, url_prefix="/api/state")
+    app.register_blueprint(config.bp, url_prefix="/api/config")
+    app.register_blueprint(relays.bp, url_prefix="/api/relays")
+    app.register_blueprint(sensors.bp, url_prefix="/api/sensors")
+    app.register_blueprint(simulator.bp, url_prefix="/api/simulator")
 
     return app
 

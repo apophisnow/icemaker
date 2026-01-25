@@ -15,11 +15,10 @@ authors = [
 
 dependencies = [
     # Pin versions for reproducibility and faster installs on Pi
-    # All pure-Python packages (no compilation required)
-    "fastapi>=0.100.0,<1.0",
+    # All pure-Python packages (no Rust compilation required)
+    "quart>=0.19.0,<1.0",
+    "quart-cors>=0.7.0,<1.0",
     "uvicorn>=0.23.0,<1.0",
-    "websockets>=11.0,<14.0",
-    "pydantic>=2.0,<3.0",
     "pyyaml>=6.0,<7.0",
 ]
 

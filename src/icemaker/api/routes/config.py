@@ -1,15 +1,18 @@
 """Configuration API routes."""
 
+from __future__ import annotations
+
+from dataclasses import asdict
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, HTTPException
+from quart import Blueprint, abort, request
 
 from ..schemas import ConfigResponse, ConfigUpdate
 
 if TYPE_CHECKING:
     from ..app import AppState
 
-router = APIRouter()
+bp = Blueprint("config", __name__)
 
 
 def get_app_state() -> "AppState":
@@ -18,16 +21,16 @@ def get_app_state() -> "AppState":
     return app_state
 
 
-@router.get("/", response_model=ConfigResponse)
-async def get_config() -> ConfigResponse:
+@bp.route("/")
+async def get_config():
     """Get current configuration."""
     state = get_app_state()
     if state.controller is None:
-        raise HTTPException(503, "Controller not initialized")
+        abort(503, description="Controller not initialized")
 
     config = state.controller.config
 
-    return ConfigResponse(
+    return asdict(ConfigResponse(
         prechill_temp=config.prechill.target_temp,
         prechill_timeout=config.prechill.timeout_seconds,
         ice_target_temp=config.ice_making.target_temp,
@@ -39,25 +42,32 @@ async def get_config() -> ConfigResponse:
         bin_full_threshold=config.bin_full_threshold,
         poll_interval=config.poll_interval,
         use_simulator=config.use_simulator,
-    )
+    ))
 
 
-@router.put("/")
-async def update_config(update: ConfigUpdate) -> ConfigResponse:
+@bp.route("/", methods=["PUT"])
+async def update_config():
     """Update configuration.
 
     Note: Changes are applied to the running controller but not
     persisted to configuration files.
-
-    Args:
-        update: Configuration values to update.
-
-    Returns:
-        Updated configuration.
     """
     state = get_app_state()
     if state.controller is None:
-        raise HTTPException(503, "Controller not initialized")
+        abort(503, description="Controller not initialized")
+
+    data = await request.get_json()
+    update = ConfigUpdate(
+        prechill_temp=data.get("prechill_temp"),
+        prechill_timeout=data.get("prechill_timeout"),
+        ice_target_temp=data.get("ice_target_temp"),
+        ice_timeout=data.get("ice_timeout"),
+        harvest_threshold=data.get("harvest_threshold"),
+        harvest_timeout=data.get("harvest_timeout"),
+        rechill_temp=data.get("rechill_temp"),
+        rechill_timeout=data.get("rechill_timeout"),
+        bin_full_threshold=data.get("bin_full_threshold"),
+    )
 
     config = state.controller.config
 
@@ -81,7 +91,7 @@ async def update_config(update: ConfigUpdate) -> ConfigResponse:
     if update.bin_full_threshold is not None:
         config.bin_full_threshold = update.bin_full_threshold
 
-    return ConfigResponse(
+    return asdict(ConfigResponse(
         prechill_temp=config.prechill.target_temp,
         prechill_timeout=config.prechill.timeout_seconds,
         ice_target_temp=config.ice_making.target_temp,
@@ -93,4 +103,4 @@ async def update_config(update: ConfigUpdate) -> ConfigResponse:
         bin_full_threshold=config.bin_full_threshold,
         poll_interval=config.poll_interval,
         use_simulator=config.use_simulator,
-    )
+    ))

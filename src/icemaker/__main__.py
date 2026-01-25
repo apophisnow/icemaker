@@ -1,5 +1,7 @@
 """Entry point for icemaker control system."""
 
+from __future__ import annotations
+
 import argparse
 import logging
 import sys
@@ -73,7 +75,7 @@ def main() -> int:
     try:
         import uvicorn
     except ImportError:
-        print("Error: uvicorn is required. Install with: pip install uvicorn[standard]")
+        print("Error: uvicorn is required. Install with: pip install uvicorn")
         return 1
 
     # Build uvicorn config
@@ -89,7 +91,7 @@ def main() -> int:
     if args.limit_concurrency:
         uvicorn_kwargs["limit_concurrency"] = args.limit_concurrency
 
-    # Run the server
+    # Run the server (Quart is ASGI-compatible)
     uvicorn.run("icemaker.api.app:app", **uvicorn_kwargs)
 
     return 0

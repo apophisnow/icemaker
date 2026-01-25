@@ -1,8 +1,11 @@
 """Relay control API routes."""
 
+from __future__ import annotations
+
+from dataclasses import asdict
 from typing import TYPE_CHECKING
 
-from fastapi import APIRouter, HTTPException
+from quart import Blueprint, abort, request
 
 from ...hal.base import RelayName
 from ..schemas import RelayCommand, RelayState
@@ -10,7 +13,7 @@ from ..schemas import RelayCommand, RelayState
 if TYPE_CHECKING:
     from ..app import AppState
 
-router = APIRouter()
+bp = Blueprint("relays", __name__)
 
 
 def get_app_state() -> "AppState":
@@ -19,47 +22,44 @@ def get_app_state() -> "AppState":
     return app_state
 
 
-@router.get("/", response_model=RelayState)
-async def get_relay_states() -> RelayState:
+@bp.route("/")
+async def get_relay_states():
     """Get current state of all relays."""
     state = get_app_state()
     if state.controller is None or state.controller.gpio is None:
-        raise HTTPException(503, "Controller not initialized")
+        abort(503, description="Controller not initialized")
 
     relay_states = await state.controller.gpio.get_all_relays()
 
     # Convert RelayName enum keys to strings
-    return RelayState(
+    return asdict(RelayState(
         relays={relay.value: on for relay, on in relay_states.items()}
-    )
+    ))
 
 
-@router.post("/")
-async def set_relay(command: RelayCommand) -> dict:
+@bp.route("/", methods=["POST"])
+async def set_relay():
     """Set a single relay state.
 
     Warning: Manual relay control can interfere with the state machine.
     Use with caution.
-
-    Args:
-        command: Relay name and desired state.
-
-    Returns:
-        Result of command.
     """
     state = get_app_state()
     if state.controller is None or state.controller.gpio is None:
-        raise HTTPException(503, "Controller not initialized")
+        abort(503, description="Controller not initialized")
+
+    data = await request.get_json()
+    command = RelayCommand(
+        relay=data.get("relay", ""),
+        on=data.get("on", False),
+    )
 
     # Validate relay name
     try:
         relay = RelayName(command.relay)
     except ValueError:
         valid_relays = [r.value for r in RelayName]
-        raise HTTPException(
-            400,
-            f"Invalid relay: {command.relay}. Valid relays: {valid_relays}",
-        )
+        abort(400, description=f"Invalid relay: {command.relay}. Valid relays: {valid_relays}")
 
     await state.controller.gpio.set_relay(relay, command.on)
 
@@ -76,18 +76,15 @@ async def set_relay(command: RelayCommand) -> dict:
     }
 
 
-@router.post("/all-off")
-async def all_relays_off() -> dict:
+@bp.route("/all-off", methods=["POST"])
+async def all_relays_off():
     """Turn off all relays.
 
     Safe operation that can be used in emergencies.
-
-    Returns:
-        Result of command.
     """
     state = get_app_state()
     if state.controller is None or state.controller.gpio is None:
-        raise HTTPException(503, "Controller not initialized")
+        abort(503, description="Controller not initialized")
 
     for relay in RelayName:
         await state.controller.gpio.set_relay(relay, False)

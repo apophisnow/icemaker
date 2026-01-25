@@ -1,56 +1,61 @@
-"""Pydantic models for API request/response schemas."""
+"""Data classes for API request/response schemas."""
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
 
-
-class StateResponse(BaseModel):
+@dataclass
+class StateResponse:
     """Current icemaker state response."""
 
     state: str
-    previous_state: Optional[str] = None
     state_enter_time: datetime
     cycle_count: int
     plate_temp: float
     bin_temp: float
-    target_temp: Optional[float] = None
     time_in_state_seconds: float
+    previous_state: Optional[str] = None
+    target_temp: Optional[float] = None
     chill_mode: Optional[str] = None
 
 
-class RelayState(BaseModel):
+@dataclass
+class RelayState:
     """State of all relays."""
 
     relays: dict[str, bool]
 
 
-class RelayCommand(BaseModel):
+@dataclass
+class RelayCommand:
     """Command to set a single relay state."""
 
     relay: str
     on: bool
 
 
-class TemperatureReading(BaseModel):
+@dataclass
+class TemperatureReading:
     """Temperature sensor readings."""
 
     plate_temp_f: float
     bin_temp_f: float
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = field(default_factory=datetime.now)
 
 
-class StateTransitionRequest(BaseModel):
+@dataclass
+class StateTransitionRequest:
     """Request to transition to a new state."""
 
     target_state: str
     force: bool = False
 
 
-class ConfigResponse(BaseModel):
+@dataclass
+class ConfigResponse:
     """Current configuration response."""
 
     prechill_temp: float
@@ -66,7 +71,8 @@ class ConfigResponse(BaseModel):
     use_simulator: bool
 
 
-class ConfigUpdate(BaseModel):
+@dataclass
+class ConfigUpdate:
     """Configuration update request."""
 
     prechill_temp: Optional[float] = None
@@ -80,21 +86,24 @@ class ConfigUpdate(BaseModel):
     bin_full_threshold: Optional[float] = None
 
 
-class WebSocketMessage(BaseModel):
+@dataclass
+class WebSocketMessage:
     """WebSocket message format."""
 
     type: str  # "state_update", "temp_update", "relay_update", "error"
     data: dict[str, Any]
-    timestamp: datetime = Field(default_factory=datetime.now)
+    timestamp: datetime = field(default_factory=datetime.now)
 
 
-class CycleCommand(BaseModel):
+@dataclass
+class CycleCommand:
     """Command to control ice-making cycle."""
 
     action: str  # "start", "stop", "emergency_stop"
 
 
-class ErrorResponse(BaseModel):
+@dataclass
+class ErrorResponse:
     """Error response."""
 
     error: str
