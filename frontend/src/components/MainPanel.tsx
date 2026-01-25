@@ -2,9 +2,10 @@
  * Main panel combining state display and system diagram in a unified card.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { IcemakerState, IcemakerStatus, RelayStates } from '../types/icemaker';
 import { useTemperature } from '../contexts/TemperatureContext';
+import { setRelay } from '../api/client';
 
 interface MainPanelProps {
   status: IcemakerStatus | null;
@@ -22,6 +23,7 @@ const STATE_DESCRIPTIONS: Record<IcemakerState, string> = {
   HEAT: 'Harvesting ice',
   ERROR: 'Error occurred',
   SHUTDOWN: 'Shutting down',
+  DIAGNOSTIC: 'Manual control',
 };
 
 function formatTime(seconds: number): string {
@@ -40,12 +42,29 @@ interface IndicatorProps {
   label: string;
   active: boolean;
   type?: 'cool' | 'heat' | 'water';
+  relayName?: string;
+  isDiagnostic?: boolean;
+  onToggle?: (relayName: string, newState: boolean) => void;
 }
 
-function Indicator({ label, active, type }: IndicatorProps) {
+function Indicator({ label, active, type, relayName, isDiagnostic, onToggle }: IndicatorProps) {
   const typeClass = active && type ? type : '';
+  const isClickable = isDiagnostic && relayName && onToggle;
+
+  const handleClick = () => {
+    if (isClickable) {
+      onToggle(relayName, !active);
+    }
+  };
+
   return (
-    <div className={`indicator ${active ? 'active' : ''} ${typeClass}`}>
+    <div
+      className={`indicator ${active ? 'active' : ''} ${typeClass} ${isClickable ? 'clickable' : ''}`}
+      onClick={handleClick}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? (e) => e.key === 'Enter' && handleClick() : undefined}
+    >
       <span className="indicator-dot" />
       <span className="indicator-label">{label}</span>
     </div>
@@ -54,6 +73,16 @@ function Indicator({ label, active, type }: IndicatorProps) {
 
 export function MainPanel({ status, relays, simulatedTimeInState }: MainPanelProps) {
   const { formatTemp } = useTemperature();
+  const isDiagnostic = status?.state === 'DIAGNOSTIC';
+
+  // Handle relay toggle in diagnostic mode
+  const handleRelayToggle = useCallback(async (relayName: string, newState: boolean) => {
+    try {
+      await setRelay(relayName, newState);
+    } catch (error) {
+      console.error('Failed to toggle relay:', error);
+    }
+  }, []);
 
   // Local timer for smooth time display updates
   const backendTime = simulatedTimeInState ?? status?.time_in_state_seconds ?? 0;
@@ -152,22 +181,22 @@ export function MainPanel({ status, relays, simulatedTimeInState }: MainPanelPro
         {relays && (
           <>
             <div className="component-group">
-              <div className="group-label">Refrigeration</div>
+              <div className="group-label">Refrigeration{isDiagnostic && ' (click to toggle)'}</div>
               <div className="component-grid">
-                <Indicator label="C1" active={relays.compressor_1} type="cool" />
-                <Indicator label="C2" active={relays.compressor_2} type="cool" />
-                <Indicator label="Fan" active={relays.condenser_fan} />
-                <Indicator label="Hot" active={relays.hot_gas_solenoid} type="heat" />
+                <Indicator label="C1" active={relays.compressor_1} type="cool" relayName="compressor_1" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
+                <Indicator label="C2" active={relays.compressor_2} type="cool" relayName="compressor_2" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
+                <Indicator label="Fan" active={relays.condenser_fan} relayName="condenser_fan" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
+                <Indicator label="Hot" active={relays.hot_gas_solenoid} type="heat" relayName="hot_gas_solenoid" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
               </div>
             </div>
 
             <div className="component-group">
-              <div className="group-label">Water/Ice</div>
+              <div className="group-label">Water/Ice{isDiagnostic && ' (click to toggle)'}</div>
               <div className="component-grid">
-                <Indicator label="Valve" active={relays.water_valve} type="water" />
-                <Indicator label="Pump" active={relays.recirculating_pump} type="water" />
-                <Indicator label="Cut" active={relays.ice_cutter} />
-                <Indicator label="LED" active={relays.LED} />
+                <Indicator label="Valve" active={relays.water_valve} type="water" relayName="water_valve" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
+                <Indicator label="Pump" active={relays.recirculating_pump} type="water" relayName="recirculating_pump" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
+                <Indicator label="Cut" active={relays.ice_cutter} relayName="ice_cutter" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
+                <Indicator label="LED" active={relays.LED} relayName="LED" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
               </div>
             </div>
 

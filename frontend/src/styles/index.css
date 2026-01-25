@@ -1380,6 +1380,25 @@ body {
   color: var(--text-primary);
 }
 
+.system-diagram-compact .indicator.clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.system-diagram-compact .indicator.clickable:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.system-diagram-compact .indicator.clickable:active {
+  transform: scale(0.95);
+}
+
+/* Diagnostic mode: sheen animation for clickable active indicators */
+.system-diagram-compact .indicator.clickable.active .indicator-dot {
+  animation: sheen 1.5s ease-in-out infinite;
+}
+
 .system-diagram-compact .temp-row {
   display: flex;
   gap: 0.5rem;
@@ -1787,6 +1806,36 @@ body {
 
 .main-panel .indicator.active .indicator-label {
   color: var(--text-primary);
+}
+
+.main-panel .indicator.clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.main-panel .indicator.clickable:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.main-panel .indicator.clickable:active {
+  transform: scale(0.95);
+}
+
+/* Diagnostic mode: sheen animation for clickable active indicators */
+.main-panel .indicator.clickable.active .indicator-dot {
+  animation: sheen 1.5s ease-in-out infinite;
+}
+
+@keyframes sheen {
+  0%, 100% {
+    filter: brightness(1);
+    transform: scale(1);
+  }
+  50% {
+    filter: brightness(1.5);
+    transform: scale(1.15);
+  }
 }
 
 .main-panel .visual-row {

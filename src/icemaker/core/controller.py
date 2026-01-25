@@ -136,6 +136,7 @@ class IcemakerController:
         self._fsm.register_handler(IcemakerState.HEAT, self._handle_heat)
         self._fsm.register_handler(IcemakerState.ERROR, self._handle_error)
         self._fsm.register_handler(IcemakerState.SHUTDOWN, self._handle_shutdown)
+        self._fsm.register_handler(IcemakerState.DIAGNOSTIC, self._handle_diagnostic)
 
         # Load persistent cycle count
         self._load_cycle_count()
@@ -400,12 +401,12 @@ class IcemakerController:
     async def power_off(self) -> bool:
         """Power off the icemaker to OFF state.
 
-        Can be called from IDLE or ERROR states.
+        Can be called from STANDBY, IDLE, or ERROR states.
 
         Returns:
             True if powered off, False if not in a valid state.
         """
-        if self._fsm.state not in {IcemakerState.IDLE, IcemakerState.ERROR}:
+        if self._fsm.state not in {IcemakerState.STANDBY, IcemakerState.IDLE, IcemakerState.ERROR}:
             return False
         return await self._fsm.transition_to(IcemakerState.OFF)
 
@@ -449,6 +450,34 @@ class IcemakerController:
             type=EventType.EMERGENCY_STOP,
             source="controller",
         ))
+
+    async def enter_diagnostic(self) -> bool:
+        """Enter diagnostic mode from OFF state.
+
+        In diagnostic mode, relays can be manually controlled via the API.
+        The FSM does not automatically control any relays.
+
+        Returns:
+            True if entered diagnostic mode, False if not in OFF state.
+        """
+        if self._fsm.state != IcemakerState.OFF:
+            return False
+        logger.info("Entering diagnostic mode")
+        return await self._fsm.transition_to(IcemakerState.DIAGNOSTIC)
+
+    async def exit_diagnostic(self) -> bool:
+        """Exit diagnostic mode and return to OFF state.
+
+        All relays will be turned off.
+
+        Returns:
+            True if exited diagnostic mode, False if not in DIAGNOSTIC state.
+        """
+        if self._fsm.state != IcemakerState.DIAGNOSTIC:
+            return False
+        logger.info("Exiting diagnostic mode")
+        await self._all_relays_off()
+        return await self._fsm.transition_to(IcemakerState.OFF)
 
     # -------------------------------------------------------------------------
     # Relay control helpers
@@ -785,3 +814,17 @@ class IcemakerController:
         """Handle SHUTDOWN state - graceful shutdown."""
         await self._all_relays_off()
         return IcemakerState.OFF
+
+    async def _handle_diagnostic(
+        self,
+        fsm: AsyncFSM,
+        ctx: FSMContext,
+    ) -> Optional[IcemakerState]:
+        """Handle DIAGNOSTIC state - manual relay control mode.
+
+        In this state, relays are not automatically controlled.
+        Users can manually toggle relays via the API for testing purposes.
+        """
+        # No automatic relay control - relays are controlled via API
+        # Just wait for exit_diagnostic() call
+        return None

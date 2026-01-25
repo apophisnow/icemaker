@@ -11,7 +11,8 @@ export type IcemakerState =
   | 'ICE'
   | 'HEAT'
   | 'ERROR'
-  | 'SHUTDOWN';
+  | 'SHUTDOWN'
+  | 'DIAGNOSTIC';
 
 export interface RelayStates {
   water_valve: boolean;

@@ -41,12 +41,16 @@ async def get_relay_states():
 async def set_relay():
     """Set a single relay state.
 
-    Warning: Manual relay control can interfere with the state machine.
-    Use with caution.
+    Only available in DIAGNOSTIC mode for manual relay control.
     """
     state = get_app_state()
     if state.controller is None or state.controller.gpio is None:
         abort(503, description="Controller not initialized")
+
+    # Check if in diagnostic mode
+    from ...core.states import IcemakerState
+    if state.controller.fsm.state != IcemakerState.DIAGNOSTIC:
+        abort(400, description="Manual relay control only available in DIAGNOSTIC mode")
 
     data = await request.get_json()
     command = RelayCommand(

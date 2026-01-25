@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { emergencyStop, powerOff, powerOn, startCycle, stopCycle } from '../api/client';
+import { emergencyStop, powerOff, powerOn, startCycle, stopCycle, enterDiagnostic, exitDiagnostic } from '../api/client';
 import type { IcemakerState, TemperatureReading } from '../types/icemaker';
 import { getRetentionHours, setRetentionHours } from '../hooks/useIcemakerState';
 import { Configuration } from './Configuration';
@@ -102,11 +102,14 @@ export function SettingsPanel({ isOpen, onClose, currentState, onRefresh }: Sett
   const isIdle = currentState === 'IDLE';
   const isInCycle = currentState && ['CHILL', 'ICE', 'HEAT'].includes(currentState);
   const isError = currentState === 'ERROR';
+  const isDiagnostic = currentState === 'DIAGNOSTIC';
 
   const canPowerOn = isOff;
-  const canPowerOff = isStandby || isError;
+  const canPowerOff = isStandby || isIdle || isError;
   const canStart = isStandby || isIdle;
   const canStop = isInCycle || isIdle;
+  const canEnterDiagnostic = isOff;
+  const canExitDiagnostic = isDiagnostic;
 
   return (
     <>
@@ -136,14 +139,31 @@ export function SettingsPanel({ isOpen, onClose, currentState, onRefresh }: Sett
             )}
 
             <div className="control-buttons">
-              {isOff ? (
+              {isDiagnostic ? (
                 <button
-                  className="btn btn-success btn-block"
-                  onClick={() => handleAction(powerOn, 'Failed to power on')}
-                  disabled={!canPowerOn || isLoading}
+                  className="btn btn-warning btn-block"
+                  onClick={() => handleAction(exitDiagnostic, 'Failed to exit diagnostic mode')}
+                  disabled={isLoading}
                 >
-                  {isLoading ? 'Powering On...' : 'Power On'}
+                  Exit Diagnostic Mode
                 </button>
+              ) : isOff ? (
+                <>
+                  <button
+                    className="btn btn-success btn-block"
+                    onClick={() => handleAction(powerOn, 'Failed to power on')}
+                    disabled={!canPowerOn || isLoading}
+                  >
+                    {isLoading ? 'Powering On...' : 'Power On'}
+                  </button>
+                  <button
+                    className="btn btn-secondary btn-block"
+                    onClick={() => handleAction(enterDiagnostic, 'Failed to enter diagnostic mode')}
+                    disabled={!canEnterDiagnostic || isLoading}
+                  >
+                    Diagnostic Mode
+                  </button>
+                </>
               ) : (
                 <button
                   className="btn btn-secondary btn-block"
@@ -154,7 +174,7 @@ export function SettingsPanel({ isOpen, onClose, currentState, onRefresh }: Sett
                 </button>
               )}
 
-              {isInCycle ? (
+              {!isDiagnostic && !isOff && (isInCycle ? (
                 <button
                   className="btn btn-warning btn-block"
                   onClick={() => handleAction(stopCycle, 'Failed to stop cycle')}
@@ -170,7 +190,7 @@ export function SettingsPanel({ isOpen, onClose, currentState, onRefresh }: Sett
                 >
                   {isLoading ? 'Starting...' : 'Start Cycle'}
                 </button>
-              )}
+              ))}
 
               <button
                 className="btn btn-danger btn-block"
@@ -182,12 +202,13 @@ export function SettingsPanel({ isOpen, onClose, currentState, onRefresh }: Sett
             </div>
 
             <p className="control-hint">
-              {isOff && 'System is off. Power on to initialize.'}
+              {isOff && 'System is off. Power on to initialize or enter diagnostic mode.'}
               {currentState === 'POWER_ON' && 'Priming water system...'}
               {isStandby && 'Ready. Start a cycle to begin making ice.'}
               {isIdle && 'Paused (bin full). Auto-restarts when bin empties.'}
               {isInCycle && 'Cycle in progress.'}
               {isError && 'Error state. Use Emergency Stop to reset.'}
+              {isDiagnostic && 'Diagnostic mode. Click relay indicators to toggle manually.'}
             </p>
           </div>
 

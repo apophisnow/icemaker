@@ -102,7 +102,7 @@ async def control_cycle():
     elif command.action == "power_off":
         success = await state.controller.power_off()
         if not success:
-            abort(400, description="Cannot power off - not in IDLE or ERROR state")
+            abort(400, description="Cannot power off - not in STANDBY, IDLE, or ERROR state")
         return {"success": True, "message": "Powered off"}
 
     elif command.action == "start":
@@ -129,6 +129,18 @@ async def control_cycle():
             "message": "State saved for graceful restart. Stop the server and restart.",
             "current_state": state.controller.fsm.state.name,
         }
+
+    elif command.action == "enter_diagnostic":
+        success = await state.controller.enter_diagnostic()
+        if not success:
+            abort(400, description="Cannot enter diagnostic mode - not in OFF state")
+        return {"success": True, "message": "Entered diagnostic mode"}
+
+    elif command.action == "exit_diagnostic":
+        success = await state.controller.exit_diagnostic()
+        if not success:
+            abort(400, description="Cannot exit diagnostic mode - not in DIAGNOSTIC state")
+        return {"success": True, "message": "Exited diagnostic mode"}
 
     else:
         abort(400, description=f"Invalid action: {command.action}")

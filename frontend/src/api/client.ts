@@ -75,6 +75,20 @@ export async function emergencyStop(): Promise<{ success: boolean; message: stri
   });
 }
 
+export async function enterDiagnostic(): Promise<{ success: boolean; message: string }> {
+  return fetchJson(`${API_BASE}/state/cycle`, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'enter_diagnostic' }),
+  });
+}
+
+export async function exitDiagnostic(): Promise<{ success: boolean; message: string }> {
+  return fetchJson(`${API_BASE}/state/cycle`, {
+    method: 'POST',
+    body: JSON.stringify({ action: 'exit_diagnostic' }),
+  });
+}
+
 export async function setRelay(
   relay: string,
   on: boolean

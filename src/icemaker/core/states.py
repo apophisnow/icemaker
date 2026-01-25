@@ -33,6 +33,7 @@ class IcemakerState(Enum):
     HEAT = auto()
     ERROR = auto()
     SHUTDOWN = auto()
+    DIAGNOSTIC = auto()  # Manual relay control mode
 
 
 class ChillMode(Enum):
@@ -70,6 +71,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
             IcemakerState.POWER_ON,
             IcemakerState.STANDBY,  # Direct power on when skipping priming
             IcemakerState.SHUTDOWN,
+            IcemakerState.DIAGNOSTIC,  # Enter diagnostic mode
         }),
     ),
     IcemakerState.STANDBY: StateConfig(
@@ -147,6 +149,13 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         timeout_seconds=30,
         allowed_transitions=frozenset({
             IcemakerState.OFF,
+        }),
+    ),
+    IcemakerState.DIAGNOSTIC: StateConfig(
+        target_temp=None,
+        timeout_seconds=float("inf"),
+        allowed_transitions=frozenset({
+            IcemakerState.OFF,  # Exit diagnostic mode
         }),
     ),
 }
