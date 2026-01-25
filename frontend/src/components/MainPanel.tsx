@@ -2,6 +2,7 @@
  * Main panel combining state display and system diagram in a unified card.
  */
 
+import { useEffect, useRef, useState } from 'react';
 import type { IcemakerState, IcemakerStatus, RelayStates } from '../types/icemaker';
 import { useTemperature } from '../contexts/TemperatureContext';
 
@@ -54,7 +55,29 @@ function Indicator({ label, active, type }: IndicatorProps) {
 export function MainPanel({ status, relays, simulatedTimeInState }: MainPanelProps) {
   const { formatTemp } = useTemperature();
 
-  const timeInState = simulatedTimeInState ?? status?.time_in_state_seconds ?? 0;
+  // Local timer for smooth time display updates
+  const backendTime = simulatedTimeInState ?? status?.time_in_state_seconds ?? 0;
+  const [displayTime, setDisplayTime] = useState(backendTime);
+  const lastUpdateRef = useRef<number>(Date.now());
+  const lastBackendTimeRef = useRef<number>(backendTime);
+
+  // Sync with backend time when it changes
+  useEffect(() => {
+    if (backendTime !== lastBackendTimeRef.current) {
+      lastBackendTimeRef.current = backendTime;
+      lastUpdateRef.current = Date.now();
+      setDisplayTime(backendTime);
+    }
+  }, [backendTime]);
+
+  // Update display every second
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - lastUpdateRef.current) / 1000;
+      setDisplayTime(lastBackendTimeRef.current + elapsed);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   if (!status) {
     return (
@@ -86,7 +109,7 @@ export function MainPanel({ status, relays, simulatedTimeInState }: MainPanelPro
         {/* Status row */}
         <div className="status-row">
           <span className="status-description">{description}</span>
-          <span className="status-time">{formatTime(timeInState)}</span>
+          <span className="status-time">{formatTime(displayTime)}</span>
         </div>
 
         {/* Cycle counts */}
