@@ -98,7 +98,7 @@ export function TemperatureChart({ data, targetTemp }: TemperatureChartProps) {
   return (
     <div className="temperature-chart">
       <h3>Temperature History {hasSimulatedTime && <span style={{ fontSize: '0.75rem', color: '#9ca3af' }}>(Simulated Time)</span>}</h3>
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis
