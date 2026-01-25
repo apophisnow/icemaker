@@ -45,10 +45,9 @@ export function Dashboard() {
             °{unit}
           </button>
           <button
-            className="header-btn"
+            className="header-btn settings-btn"
             onClick={() => setSettingsOpen(true)}
             title="Settings"
-            style={{ fontSize: '1.25rem' }}
           >
             ⚙
           </button>
