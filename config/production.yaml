@@ -28,10 +28,6 @@ hardware:
   plate_sensor_id: "092101487373"   # plate_temp_sensor_id
   bin_sensor_id: "3c01f0956abd"     # ice_bin_temp_sensor_id
 
-api:
-  host: "0.0.0.0"
-  port: 80
-
 startup:
   skip_priming: true        # Skip priming by default (system already primed)
 

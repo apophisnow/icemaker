@@ -82,7 +82,7 @@ class IcemakerConfig:
 
     # API settings
     api_host: str = "0.0.0.0"
-    api_port: int = 80
+    api_port: int = 8000
 
     # Logging
     log_level: str = "INFO"

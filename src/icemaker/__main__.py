@@ -20,8 +20,8 @@ def main() -> int:
     parser.add_argument(
         "--port",
         type=int,
-        default=80,
-        help="Port to bind API server to (default: 80)",
+        default=8000,
+        help="Port to bind API server to (default: 8000)",
     )
     parser.add_argument(
         "--simulator",
