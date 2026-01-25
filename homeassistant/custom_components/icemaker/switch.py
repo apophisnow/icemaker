@@ -49,8 +49,8 @@ class IcemakerCycleSwitch(CoordinatorEntity[IcemakerCoordinator], SwitchEntity):
     def is_on(self) -> bool:
         """Return true if cycle is running."""
         state = self.coordinator.data.state
-        # Cycle is "on" when not in IDLE, ERROR, or SHUTDOWN states
-        return state not in ("IDLE", "ERROR", "SHUTDOWN", "UNKNOWN")
+        # Cycle is "on" when actively making ice (POWER_ON, CHILL, ICE, HEAT)
+        return state in ("POWER_ON", "CHILL", "ICE", "HEAT")
 
     async def async_turn_on(self, **kwargs) -> None:
         """Start the ice-making cycle."""

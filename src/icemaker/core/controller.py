@@ -237,13 +237,11 @@ class IcemakerController:
         """Stop the controller.
 
         Args:
-            graceful: If True, save state for restart without changing relays.
+            graceful: If True, preserve relay states for restart.
                      If False (default), turn off all relays and do full shutdown.
         """
         if graceful:
-            # Save state BEFORE stopping anything
-            await self._save_state()
-            logger.info("Graceful shutdown: state saved, relays will be preserved on restart")
+            logger.info("Graceful shutdown: relays will be preserved on restart")
 
         self._running = False
 

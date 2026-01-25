@@ -114,11 +114,10 @@ async def control_cycle():
         return {"success": True, "message": "Emergency stop executed"}
 
     elif command.action == "prepare_restart":
-        # Save state for graceful restart (preserves relay states)
-        await state.controller._save_state()
+        # No state saving needed - ice making flag handles power loss recovery
         return {
             "success": True,
-            "message": "State saved for graceful restart. Stop the server and restart.",
+            "message": "Ready for restart. Ice making will resume if it was active.",
             "current_state": state.controller.fsm.state.name,
         }
 
