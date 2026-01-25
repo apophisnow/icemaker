@@ -165,11 +165,16 @@ setup_with_pip() {
     info "Upgrading pip..."
     .venv/bin/pip install --upgrade pip
 
+    # Pi-optimized pip flags:
+    # --no-cache-dir: Save disk space (SD cards are small)
+    # --compile: Pre-compile .pyc files for faster startup
+    local PIP_FLAGS="--no-cache-dir --compile"
+
     info "Installing package..."
     if [ -n "$extras" ]; then
-        .venv/bin/pip install -e ".[$extras]"
+        .venv/bin/pip install $PIP_FLAGS -e ".[$extras]"
     else
-        .venv/bin/pip install -e .
+        .venv/bin/pip install $PIP_FLAGS -e .
     fi
 }
 
@@ -191,10 +196,18 @@ After=network.target
 Type=simple
 User=$SERVICE_USER
 WorkingDirectory=$SCRIPT_DIR
+# Production environment
 Environment=ICEMAKER_ENV=production
-ExecStart=$(which uv 2>/dev/null || echo "$SCRIPT_DIR/.venv/bin/python") run python -m icemaker
+# Python optimizations for Pi
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=0
+Environment=PYTHONOPTIMIZE=1
+# Pi-optimized: disable access log, limit concurrent connections
+ExecStart=$(which uv 2>/dev/null || echo "$SCRIPT_DIR/.venv/bin/python") run python -m icemaker --no-access-log --limit-concurrency 10
 Restart=always
 RestartSec=5
+# Memory limit to prevent OOM on Pi (adjust as needed)
+MemoryMax=256M
 
 [Install]
 WantedBy=multi-user.target
@@ -202,7 +215,7 @@ EOF
 
     # Fix ExecStart if using venv instead of uv
     if ! has_uv; then
-        sudo sed -i "s|ExecStart=.*|ExecStart=$SCRIPT_DIR/.venv/bin/python -m icemaker|" "$SERVICE_FILE"
+        sudo sed -i "s|ExecStart=.*|ExecStart=$SCRIPT_DIR/.venv/bin/python -m icemaker --no-access-log --limit-concurrency 10|" "$SERVICE_FILE"
     fi
 
     info "Reloading systemd daemon..."

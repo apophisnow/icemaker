@@ -42,6 +42,17 @@ def main() -> int:
         action="store_true",
         help="Enable auto-reload for development",
     )
+    parser.add_argument(
+        "--no-access-log",
+        action="store_true",
+        help="Disable access logging (reduces I/O on Pi)",
+    )
+    parser.add_argument(
+        "--limit-concurrency",
+        type=int,
+        default=None,
+        help="Limit concurrent connections (helps on memory-constrained devices)",
+    )
 
     args = parser.parse_args()
 
@@ -65,14 +76,21 @@ def main() -> int:
         print("Error: uvicorn is required. Install with: pip install uvicorn[standard]")
         return 1
 
+    # Build uvicorn config
+    uvicorn_kwargs = {
+        "host": args.host,
+        "port": args.port,
+        "reload": args.reload,
+        "log_level": args.log_level.lower(),
+        "access_log": not args.no_access_log,
+    }
+
+    # Add concurrency limit if specified (helps on Pi)
+    if args.limit_concurrency:
+        uvicorn_kwargs["limit_concurrency"] = args.limit_concurrency
+
     # Run the server
-    uvicorn.run(
-        "icemaker.api.app:app",
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-        log_level=args.log_level.lower(),
-    )
+    uvicorn.run("icemaker.api.app:app", **uvicorn_kwargs)
 
     return 0
 
