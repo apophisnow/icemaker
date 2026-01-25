@@ -29,7 +29,7 @@ hardware:
   bin_sensor_id: "3c01f0956abd"     # ice_bin_temp_sensor_id
 
 startup:
-  skip_priming: true        # Skip priming by default (system already primed)
+  priming_enabled: false    # Priming disabled by default (system already primed)
 
 simulation:
   enabled: false

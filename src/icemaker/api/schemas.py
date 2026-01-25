@@ -71,6 +71,7 @@ class ConfigResponse:
     bin_full_threshold: float
     poll_interval: float
     use_simulator: bool
+    priming_enabled: bool
 
 
 @dataclass
@@ -86,6 +87,7 @@ class ConfigUpdate:
     rechill_temp: Optional[float] = None
     rechill_timeout: Optional[int] = None
     bin_full_threshold: Optional[float] = None
+    priming_enabled: Optional[bool] = None
 
 
 @dataclass

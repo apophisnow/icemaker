@@ -110,11 +110,11 @@ By default, the water priming sequence is skipped on startup (assumes the system
 
 ```bash
 # One-time priming
-ICEMAKER_SKIP_PRIMING=false uv run python -m icemaker
+ICEMAKER_PRIMING_ENABLED=true uv run python -m icemaker
 
 # Or set in config/production.yaml:
 # startup:
-#   skip_priming: false
+#   priming_enabled: true
 ```
 
 ### Manual Installation (without setup script)

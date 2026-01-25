@@ -42,6 +42,7 @@ async def get_config():
         bin_full_threshold=config.bin_full_threshold,
         poll_interval=config.poll_interval,
         use_simulator=config.use_simulator,
+        priming_enabled=config.priming_enabled,
     ))
 
 
@@ -67,6 +68,7 @@ async def update_config():
         rechill_temp=data.get("rechill_temp"),
         rechill_timeout=data.get("rechill_timeout"),
         bin_full_threshold=data.get("bin_full_threshold"),
+        priming_enabled=data.get("priming_enabled"),
     )
 
     config = state.controller.config
@@ -90,6 +92,8 @@ async def update_config():
         config.rechill.timeout_seconds = update.rechill_timeout
     if update.bin_full_threshold is not None:
         config.bin_full_threshold = update.bin_full_threshold
+    if update.priming_enabled is not None:
+        config.priming_enabled = update.priming_enabled
 
     return asdict(ConfigResponse(
         prechill_temp=config.prechill.target_temp,
@@ -103,4 +107,5 @@ async def update_config():
         bin_full_threshold=config.bin_full_threshold,
         poll_interval=config.poll_interval,
         use_simulator=config.use_simulator,
+        priming_enabled=config.priming_enabled,
     ))

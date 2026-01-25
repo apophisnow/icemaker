@@ -97,7 +97,7 @@ export function Configuration() {
     }
   };
 
-  const handleChange = (key: keyof IcemakerConfig, value: number) => {
+  const handleChange = (key: keyof IcemakerConfig, value: number | boolean) => {
     setPendingChanges((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -338,6 +338,16 @@ export function Configuration() {
               <span className={`config-simulator-value ${config?.use_simulator ? 'enabled' : 'disabled'}`}>
                 {config?.use_simulator ? 'Enabled' : 'Disabled'}
               </span>
+            </div>
+            <div className="config-toggle-field">
+              <label className="config-label">Priming on Power On</label>
+              <button
+                className={`toggle-btn ${(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'active' : ''}`}
+                onClick={() => handleChange('priming_enabled', !(pendingChanges.priming_enabled ?? config?.priming_enabled))}
+                disabled={isSaving}
+              >
+                {(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'Enabled' : 'Disabled'}
+              </button>
             </div>
           </div>
 

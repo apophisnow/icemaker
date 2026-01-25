@@ -66,6 +66,7 @@ export interface IcemakerConfig {
   bin_full_threshold: number;
   poll_interval: number;
   use_simulator: boolean;
+  priming_enabled: boolean;
 }
 
 export interface StateUpdateData {

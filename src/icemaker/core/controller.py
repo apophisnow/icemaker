@@ -49,7 +49,7 @@ class IcemakerController:
     - STANDBY: Manual control - waits for explicit start_cycle()
     - IDLE: Active ice-making paused - auto-restarts when bin empties
 
-    Priming can be enabled via power_on(prime=True) or config.skip_priming=False.
+    Priming can be enabled via power_on(prime=True) or config.priming_enabled=True.
     """
 
     def __init__(
@@ -384,7 +384,7 @@ class IcemakerController:
 
         Args:
             prime: Whether to run the water priming sequence.
-                   If None (default), uses config.skip_priming setting.
+                   If None (default), uses config.priming_enabled setting.
                    If True, always runs priming sequence.
                    If False, skips priming and goes directly to STANDBY.
 
@@ -395,7 +395,7 @@ class IcemakerController:
             return False
 
         # Determine whether to prime based on parameter or config
-        should_prime = prime if prime is not None else not self.config.skip_priming
+        should_prime = prime if prime is not None else self.config.priming_enabled
 
         if should_prime:
             logger.info("Power on with water priming sequence")

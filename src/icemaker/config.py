@@ -99,7 +99,7 @@ class IcemakerConfig:
     standby_timeout: float = 1200.0  # 20 minutes
 
     # Startup options
-    skip_priming: bool = True  # Skip water priming on startup (default: skip)
+    priming_enabled: bool = False  # Run water priming on power on (default: disabled)
 
     # Data directory for persistent storage (cycle count, etc.)
     data_dir: str = "data"
@@ -212,7 +212,7 @@ def _merge_yaml(config: IcemakerConfig, path: Path) -> IcemakerConfig:
 
     if "startup" in data:
         startup = data["startup"]
-        config.skip_priming = startup.get("skip_priming", config.skip_priming)
+        config.priming_enabled = startup.get("priming_enabled", config.priming_enabled)
 
     return config
 
@@ -235,7 +235,7 @@ def _apply_env_overrides(config: IcemakerConfig) -> IcemakerConfig:
         "ICEMAKER_API_PORT": ("api_port", None, int),
         "ICEMAKER_LOG_LEVEL": ("log_level", None, str),
         "ICEMAKER_POLL_INTERVAL": ("poll_interval", None, float),
-        "ICEMAKER_SKIP_PRIMING": ("skip_priming", None, _parse_bool),
+        "ICEMAKER_PRIMING_ENABLED": ("priming_enabled", None, _parse_bool),
     }
 
     for env_var, (attr, sub_attr, converter) in env_map.items():
