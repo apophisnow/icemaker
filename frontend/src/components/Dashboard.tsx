@@ -2,11 +2,9 @@
  * Main dashboard component.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useIcemakerState } from '../hooks/useIcemakerState';
 import { useTemperature } from '../contexts/TemperatureContext';
-import { useDataLogger } from '../contexts/DataLoggerContext';
-import { DataLogger } from './DataLogger';
 import { MainPanel } from './MainPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { TemperatureChart } from './TemperatureChart';
@@ -23,18 +21,7 @@ export function Dashboard() {
     refresh,
   } = useIcemakerState();
   const { unit, toggleUnit } = useTemperature();
-  const { logData, isLogging } = useDataLogger();
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  // Log data when status updates and logging is active
-  useEffect(() => {
-    if (isLogging && status) {
-      // Get simulated time from the latest temperature reading
-      const latestReading = temperatureHistory[temperatureHistory.length - 1];
-      const simulatedTime = latestReading?.simulated_time_seconds;
-      logData(status, relays, simulatedTime);
-    }
-  }, [isLogging, status, relays, temperatureHistory, logData]);
 
   if (isLoading) {
     return (
@@ -85,7 +72,6 @@ export function Dashboard() {
           relays={relays}
           simulatedTimeInState={status?.time_in_state_seconds}
         />
-        <DataLogger />
         <div className="chart-card">
           <TemperatureChart
             data={temperatureHistory}

@@ -27,17 +27,64 @@ interface IcemakerState {
 // Use current host for WebSocket (works in both dev and production)
 const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 const WS_URL = `${WS_PROTOCOL}//${window.location.host}/api/state/ws`;
-const MAX_HISTORY = 100;
+const MAX_HISTORY = 1000;
+const STORAGE_KEY = 'icemaker_temp_history';
+const RETENTION_KEY = 'icemaker_retention_hours';
+const DEFAULT_RETENTION_HOURS = 24;
+
+export function getRetentionHours(): number {
+  try {
+    const stored = localStorage.getItem(RETENTION_KEY);
+    if (stored) {
+      const hours = parseInt(stored, 10);
+      if (!isNaN(hours) && hours > 0) return hours;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return DEFAULT_RETENTION_HOURS;
+}
+
+export function setRetentionHours(hours: number): void {
+  try {
+    localStorage.setItem(RETENTION_KEY, String(hours));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+function loadStoredHistory(): TemperatureReading[] {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as TemperatureReading[];
+      const retentionMs = getRetentionHours() * 60 * 60 * 1000;
+      const cutoff = Date.now() - retentionMs;
+      return parsed.filter(r => new Date(r.timestamp).getTime() > cutoff);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return [];
+}
+
+function saveHistory(history: TemperatureReading[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+  } catch {
+    // Ignore storage errors (quota exceeded, etc.)
+  }
+}
 
 export function useIcemakerState() {
-  const [state, setState] = useState<IcemakerState>({
+  const [state, setState] = useState<IcemakerState>(() => ({
     status: null,
     relays: null,
-    temperatureHistory: [],
+    temperatureHistory: loadStoredHistory(),
     isConnected: false,
     isLoading: true,
     error: null,
-  });
+  }));
 
   const handleMessage = useCallback((message: WebSocketMessage) => {
     switch (message.type) {
@@ -72,23 +119,29 @@ export function useIcemakerState() {
           simulated_time_seconds: data.simulated_time_seconds,
           timestamp: message.timestamp,
         };
-        setState((prev) => ({
-          ...prev,
-          temperatureHistory: [
+        setState((prev) => {
+          const newHistory = [
             ...prev.temperatureHistory.slice(-MAX_HISTORY + 1),
             tempReading,
-          ],
-          status: prev.status
-            ? {
-                ...prev.status,
-                plate_temp: data.plate_temp_f,
-                bin_temp: data.bin_temp_f,
-                water_temp: data.water_temp_f,
-                target_temp: data.target_temp ?? prev.status.target_temp,
-                time_in_state_seconds: data.time_in_state_seconds ?? prev.status.time_in_state_seconds,
-              }
-            : null,
-        }));
+          ];
+          // Save to localStorage
+          saveHistory(newHistory);
+          return {
+            ...prev,
+            temperatureHistory: newHistory,
+            status: prev.status
+              ? {
+                  ...prev.status,
+                  plate_temp: data.plate_temp_f,
+                  bin_temp: data.bin_temp_f,
+                  water_temp: data.water_temp_f,
+                  target_temp: data.target_temp ?? prev.status.target_temp,
+                  time_in_state_seconds:
+                    data.time_in_state_seconds ?? prev.status.time_in_state_seconds,
+                }
+              : null,
+          };
+        });
         break;
       }
 
