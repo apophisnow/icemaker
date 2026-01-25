@@ -33,10 +33,12 @@ body {
 
 /* Dashboard Layout */
 .dashboard {
-  flex: 1;
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   padding: 1rem;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .dashboard.loading-state {
@@ -67,9 +69,10 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   background: var(--bg-secondary);
   border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .dashboard-header h1 {
@@ -137,6 +140,7 @@ body {
   border: 1px solid var(--accent-red);
   border-radius: 8px;
   color: var(--accent-red);
+  flex-shrink: 0;
 }
 
 .error-banner button {
@@ -146,24 +150,6 @@ body {
   padding: 0.25rem 0.75rem;
   border-radius: 4px;
   cursor: pointer;
-}
-
-/* Dashboard Grid */
-.dashboard-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: auto auto;
-  gap: 1.5rem;
-}
-
-.dashboard-grid section {
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  padding: 1.5rem;
-}
-
-.dashboard-grid .diagram-section {
-  grid-column: 1 / -1;
 }
 
 /* State Display */
@@ -1487,7 +1473,8 @@ body {
   grid-template-columns: 300px 1fr;
   grid-template-rows: minmax(0, 1fr) auto;
   gap: 1rem;
-  height: calc(100vh - 100px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
