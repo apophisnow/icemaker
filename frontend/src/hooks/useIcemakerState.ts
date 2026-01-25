@@ -24,7 +24,9 @@ interface IcemakerState {
   error: string | null;
 }
 
-const WS_URL = `ws://${window.location.hostname}:8000/api/state/ws`;
+// Use current host for WebSocket (works in both dev and production)
+const WS_PROTOCOL = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const WS_URL = `${WS_PROTOCOL}//${window.location.host}/api/state/ws`;
 const MAX_HISTORY = 100;
 
 export function useIcemakerState() {

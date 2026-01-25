@@ -1,9 +1,10 @@
 #!/bin/bash
 # Icemaker Setup Script
-# Usage: ./setup.sh [--service]
+# Usage: ./setup.sh [--service] [--no-frontend]
 #
 # This script sets up the icemaker control system after a fresh git clone.
 # Run with --service to also install and enable the systemd service.
+# Run with --no-frontend to skip frontend build (useful on Pi if building elsewhere).
 
 set -e
 
@@ -53,6 +54,11 @@ has_uv() {
     command -v uv &>/dev/null
 }
 
+# Check for npm
+has_npm() {
+    command -v npm &>/dev/null
+}
+
 # Install uv if not present
 install_uv() {
     info "Installing uv package manager..."
@@ -63,12 +69,16 @@ install_uv() {
 # Main setup
 main() {
     local install_service=false
+    local build_frontend=true
 
     # Parse arguments
     for arg in "$@"; do
         case $arg in
             --service)
                 install_service=true
+                ;;
+            --no-frontend)
+                build_frontend=false
                 ;;
             *)
                 warn "Unknown argument: $arg"
@@ -107,6 +117,13 @@ main() {
         fi
     fi
 
+    # Build frontend
+    if [ "$build_frontend" = true ]; then
+        setup_frontend
+    else
+        info "Skipping frontend build (--no-frontend)"
+    fi
+
     # Create environment file
     info "Creating environment configuration..."
     cat > "$SCRIPT_DIR/.env" << EOF
@@ -135,6 +152,9 @@ EOF
         echo "  source .venv/bin/activate"
         echo "  python -m icemaker"
     fi
+    echo ""
+    echo "For development (frontend + backend):"
+    echo "  ./dev.sh"
     echo ""
     if is_raspberry_pi; then
         echo "To install as a system service:"
@@ -176,6 +196,30 @@ setup_with_pip() {
     else
         .venv/bin/pip install $PIP_FLAGS -e .
     fi
+}
+
+setup_frontend() {
+    if ! has_npm; then
+        warn "npm not found - skipping frontend build"
+        warn "Install Node.js to build the frontend, or copy pre-built frontend/dist/"
+        return
+    fi
+
+    info "Setting up frontend..."
+    cd "$SCRIPT_DIR/frontend"
+
+    if [ ! -d "node_modules" ]; then
+        info "Installing frontend dependencies..."
+        npm install
+    else
+        info "Frontend dependencies already installed"
+    fi
+
+    info "Building frontend..."
+    npm run build
+
+    cd "$SCRIPT_DIR"
+    info "Frontend built successfully"
 }
 
 install_systemd_service() {

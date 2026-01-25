@@ -5,9 +5,10 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Optional
 
-from quart import Quart
+from quart import Quart, send_from_directory
 from quart_cors import cors
 
 from ..config import load_config
@@ -253,9 +254,13 @@ def create_app() -> Quart:
         """Application shutdown."""
         await _shutdown_tasks()
 
-    @app.route("/")
-    async def index():
-        """Root endpoint - basic status info."""
+    # Determine frontend dist directory
+    module_dir = Path(__file__).parent
+    frontend_dist = module_dir.parent.parent.parent / "frontend" / "dist"
+
+    @app.route("/api/status")
+    async def api_status():
+        """API status endpoint."""
         controller = app_state.controller
         if controller is None:
             return {"status": "initializing"}
@@ -268,11 +273,9 @@ def create_app() -> Quart:
             "plate_temp_f": ctx.plate_temp,
             "bin_temp_f": ctx.bin_temp,
             "cycle_count": ctx.cycle_count,
-            "api": "/api",
-            "health": "/health",
         }
 
-    @app.route("/health")
+    @app.route("/api/health")
     async def health_check():
         """Health check endpoint."""
         return {
@@ -281,7 +284,7 @@ def create_app() -> Quart:
             "websocket_connections": app_state.ws_manager.connection_count,
         }
 
-    # Register blueprints
+    # Register API blueprints
     from .routes import config, relays, sensors, simulator, state
 
     app.register_blueprint(state.bp, url_prefix="/api/state")
@@ -289,6 +292,26 @@ def create_app() -> Quart:
     app.register_blueprint(relays.bp, url_prefix="/api/relays")
     app.register_blueprint(sensors.bp, url_prefix="/api/sensors")
     app.register_blueprint(simulator.bp, url_prefix="/api/simulator")
+
+    # Static file serving for frontend
+    @app.route("/")
+    async def serve_index():
+        """Serve frontend index.html."""
+        if frontend_dist.exists():
+            return await send_from_directory(str(frontend_dist), "index.html")
+        # Fallback to API status if no frontend built
+        return await api_status()
+
+    @app.route("/<path:path>")
+    async def serve_static(path: str):
+        """Serve static files or fall back to index.html for SPA routing."""
+        if frontend_dist.exists():
+            file_path = frontend_dist / path
+            if file_path.exists() and file_path.is_file():
+                return await send_from_directory(str(frontend_dist), path)
+            # SPA fallback - serve index.html for client-side routing
+            return await send_from_directory(str(frontend_dist), "index.html")
+        return {"error": "Frontend not built. Run 'npm run build' in frontend/"}, 404
 
     return app
 
