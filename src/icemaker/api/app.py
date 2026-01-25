@@ -243,13 +243,10 @@ def create_app() -> Quart:
         # Initialize hardware (HAL setup)
         await app_state.controller.initialize()
 
-        # Try to restore state from a previous graceful shutdown
-        restored = await app_state.controller._load_and_restore_state()
-        if restored:
-            logger.info(
-                "Resumed from graceful restart: state=%s",
-                app_state.controller.fsm.state.name,
-            )
+        # Check for power loss recovery
+        if app_state.controller._get_ice_making_flag():
+            logger.info("Power loss recovery: resuming ice making")
+            await app_state.controller.start_icemaking()
 
         # Start thermal model if using simulator
         if app_state.controller._thermal_model is not None:

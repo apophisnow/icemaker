@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from ..config import IcemakerConfig, load_config
 from ..hal.base import (
@@ -34,9 +33,8 @@ class IcemakerController:
     that control relay states based on temperature readings.
 
     The controller implements the ice-making cycle:
-    0. OFF: System powered off
-    1. POWER_ON: Prime water system (optional, skipped by default)
-    2. STANDBY: Waiting for manual start_cycle() call
+    1. OFF: System powered off - call start_icemaking() to begin
+    2. POWER_ON: Prime water system (optional, if priming_enabled=True)
     3. CHILL (prechill): Cool plate to 32°F
     4. ICE: Make ice at -2°F with recirculation
     5. HEAT: Harvest ice at 38°F
@@ -45,11 +43,8 @@ class IcemakerController:
        - Bin full: IDLE (auto-restarts when bin empties)
        - Bin not full: repeat cycle
 
-    STANDBY vs IDLE:
-    - STANDBY: Manual control - waits for explicit start_cycle()
-    - IDLE: Active ice-making paused - auto-restarts when bin empties
-
-    Priming can be enabled via power_on(prime=True) or config.priming_enabled=True.
+    Power loss recovery: If ice making was active when power was lost,
+    it will automatically resume on restart.
     """
 
     def __init__(
@@ -177,133 +172,38 @@ class IcemakerController:
         except OSError as e:
             logger.warning("Failed to save cycle count: %s", e)
 
-    def _get_state_path(self) -> Path:
-        """Get path to the state persistence file."""
+    def _get_ice_making_flag_path(self) -> Path:
+        """Get path to the ice making flag file."""
         data_dir = Path(self.config.data_dir)
         data_dir.mkdir(parents=True, exist_ok=True)
-        return data_dir / "state.json"
+        return data_dir / "ice_making_active"
 
-    async def _save_state(self) -> None:
-        """Save current state for graceful restart.
+    def _set_ice_making_flag(self, active: bool) -> None:
+        """Set the ice making flag for power loss recovery.
 
-        Saves FSM state, relay states, and context to enable
-        resuming operation after a restart without changing relay states.
+        Args:
+            active: True if ice making should resume after power loss.
         """
-        if self._gpio is None:
-            return
-
-        path = self._get_state_path()
+        path = self._get_ice_making_flag_path()
         try:
-            relay_states = await self._gpio.get_all_relays()
-            ctx = self._fsm.context
+            if active:
+                path.write_text("1")
+                logger.debug("Ice making flag set (will resume after power loss)")
+            else:
+                if path.exists():
+                    path.unlink()
+                logger.debug("Ice making flag cleared")
+        except OSError as e:
+            logger.warning("Failed to set ice making flag: %s", e)
 
-            state_data: dict[str, Any] = {
-                "version": 1,
-                "timestamp": datetime.now().isoformat(),
-                "fsm_state": self._fsm.state.value,
-                "previous_state": (
-                    self._fsm.previous_state.value if self._fsm.previous_state else None
-                ),
-                "relays": {name.value: on for name, on in relay_states.items()},
-                "context": {
-                    "plate_temp": ctx.plate_temp,
-                    "bin_temp": ctx.bin_temp,
-                    "target_temp": ctx.target_temp,
-                    "cycle_count": ctx.cycle_count,
-                    "chill_mode": ctx.chill_mode,
-                    "state_enter_time": ctx.state_enter_time.isoformat(),
-                    "cycle_start_time": (
-                        ctx.cycle_start_time.isoformat() if ctx.cycle_start_time else None
-                    ),
-                },
-            }
-
-            path.write_text(json.dumps(state_data, indent=2))
-            logger.info("Saved state for graceful restart: %s", self._fsm.state.name)
-        except (OSError, TypeError) as e:
-            logger.warning("Failed to save state: %s", e)
-
-    async def _load_and_restore_state(self) -> bool:
-        """Load and restore state from a previous run.
-
-        Restores relay states immediately to maintain hardware state,
-        then restores FSM state and context.
+    def _get_ice_making_flag(self) -> bool:
+        """Check if ice making should resume after power loss.
 
         Returns:
-            True if state was restored, False if no valid state found.
+            True if ice making was active before power loss.
         """
-        path = self._get_state_path()
-        if not path.exists():
-            logger.info("No saved state found, starting fresh")
-            return False
-
-        try:
-            state_data = json.loads(path.read_text())
-
-            # Validate version
-            if state_data.get("version") != 1:
-                logger.warning("Unknown state file version, ignoring")
-                return False
-
-            # Restore relay states FIRST (before FSM runs)
-            if self._gpio is not None and "relays" in state_data:
-                for relay_name, on in state_data["relays"].items():
-                    try:
-                        relay = RelayName(relay_name)
-                        await self._set_relay(relay, on)
-                        logger.debug("Restored relay %s = %s", relay_name, on)
-                    except ValueError:
-                        logger.warning("Unknown relay in saved state: %s", relay_name)
-
-            # Restore FSM state
-            fsm_state_name = state_data.get("fsm_state")
-            if fsm_state_name:
-                try:
-                    restored_state = IcemakerState(fsm_state_name)
-                    self._fsm._state = restored_state
-                    logger.info("Restored FSM state: %s", restored_state.name)
-                except ValueError:
-                    logger.warning("Unknown FSM state in saved state: %s", fsm_state_name)
-
-            # Restore previous state
-            prev_state_name = state_data.get("previous_state")
-            if prev_state_name:
-                try:
-                    self._fsm._previous_state = IcemakerState(prev_state_name)
-                except ValueError:
-                    pass
-
-            # Restore context
-            ctx_data = state_data.get("context", {})
-            ctx = self._fsm.context
-            ctx.plate_temp = ctx_data.get("plate_temp", 70.0)
-            ctx.bin_temp = ctx_data.get("bin_temp", 70.0)
-            ctx.target_temp = ctx_data.get("target_temp", 32.0)
-            ctx.cycle_count = ctx_data.get("cycle_count", 0)
-            ctx.chill_mode = ctx_data.get("chill_mode")
-
-            if ctx_data.get("state_enter_time"):
-                ctx.state_enter_time = datetime.fromisoformat(ctx_data["state_enter_time"])
-            if ctx_data.get("cycle_start_time"):
-                ctx.cycle_start_time = datetime.fromisoformat(ctx_data["cycle_start_time"])
-
-            # Remove state file after successful restore
-            path.unlink()
-            logger.info("State restored successfully, removed state file")
-            return True
-
-        except (json.JSONDecodeError, OSError, KeyError) as e:
-            logger.warning("Failed to restore state: %s", e)
-            return False
-
-    def _clear_saved_state(self) -> None:
-        """Remove the saved state file (used after clean shutdown)."""
-        path = self._get_state_path()
-        try:
-            if path.exists():
-                path.unlink()
-        except OSError:
-            pass
+        path = self._get_ice_making_flag_path()
+        return path.exists()
 
     async def start(self) -> None:
         """Start the controller.
@@ -311,13 +211,10 @@ class IcemakerController:
         Initializes hardware, starts the thermal model (if simulating),
         starts the sensor polling task, and runs the FSM.
 
-        If a previous graceful shutdown left a saved state, relay states
-        and FSM state will be restored automatically.
+        If ice making was active before a power loss, the cycle will
+        automatically resume.
         """
         await self.initialize()
-
-        # Try to restore state from a previous graceful shutdown
-        restored = await self._load_and_restore_state()
 
         self._running = True
 
@@ -328,8 +225,10 @@ class IcemakerController:
         # Start sensor polling
         self._sensor_task = asyncio.create_task(self._poll_sensors())
 
-        if restored:
-            logger.info("Resuming from restored state: %s", self._fsm.state.name)
+        # Auto-resume ice making if flag was set (power loss recovery)
+        if self._get_ice_making_flag():
+            logger.info("Power loss recovery: resuming ice making")
+            await self.start_icemaking()
 
         # Run FSM (this blocks until stop() is called)
         await self._fsm.run()
@@ -372,37 +271,12 @@ class IcemakerController:
                 # Don't turn off relays - just cleanup GPIO without state changes
                 await self._gpio.cleanup()
             else:
-                # Full shutdown - turn off all relays
+                # Full shutdown - turn off all relays and clear recovery flag
                 await self._all_relays_off()
                 await self._gpio.cleanup()
-                self._clear_saved_state()
+                self._set_ice_making_flag(False)
 
         logger.info("Controller stopped (graceful=%s)", graceful)
-
-    async def power_on(self, prime: bool | None = None) -> bool:
-        """Power on the icemaker from OFF state.
-
-        Args:
-            prime: Whether to run the water priming sequence.
-                   If None (default), uses config.priming_enabled setting.
-                   If True, always runs priming sequence.
-                   If False, skips priming and goes directly to STANDBY.
-
-        Returns:
-            True if power on started, False if not in OFF state.
-        """
-        if self._fsm.state != IcemakerState.OFF:
-            return False
-
-        # Determine whether to prime based on parameter or config
-        should_prime = prime if prime is not None else self.config.priming_enabled
-
-        if should_prime:
-            logger.info("Power on with water priming sequence")
-            return await self._fsm.transition_to(IcemakerState.POWER_ON)
-        else:
-            logger.info("Power on skipping priming sequence")
-            return await self._fsm.transition_to(IcemakerState.STANDBY)
 
     async def power_off(self) -> bool:
         """Power off the icemaker.
@@ -415,6 +289,9 @@ class IcemakerController:
         Returns:
             True if shutdown initiated, False if not in a valid state.
         """
+        # Clear ice making flag so we don't auto-resume after power loss
+        self._set_ice_making_flag(False)
+
         # Direct shutdown from non-cycle states
         if self._fsm.state in {IcemakerState.STANDBY, IcemakerState.IDLE, IcemakerState.ERROR}:
             self._shutdown_requested = False  # Clear flag if set
@@ -429,40 +306,43 @@ class IcemakerController:
 
         return False
 
-    async def start_cycle(self) -> bool:
-        """Start an ice-making cycle from STANDBY or IDLE state.
+    async def start_icemaking(self) -> bool:
+        """Start ice making.
+
+        Can be called from OFF, STANDBY, or IDLE state.
+        From OFF: runs priming sequence (if enabled) then starts cycle.
+        From STANDBY/IDLE: starts cycle immediately.
 
         Returns:
-            True if cycle started, False if not in a valid state.
+            True if started, False if not in a valid state.
         """
-        if self._fsm.state not in {IcemakerState.STANDBY, IcemakerState.IDLE}:
-            return False
-        self._fsm.context.chill_mode = "prechill"
-        self._fsm.context.cycle_start_time = datetime.now()
-        return await self._fsm.transition_to(IcemakerState.CHILL)
+        # Set flag for power loss recovery
+        self._set_ice_making_flag(True)
 
-    async def stop_cycle(self) -> bool:
-        """Stop the current ice-making cycle and return to STANDBY.
+        # From OFF: power on first (with optional priming)
+        if self._fsm.state == IcemakerState.OFF:
+            if self.config.priming_enabled:
+                logger.info("Starting ice making with priming sequence")
+                return await self._fsm.transition_to(IcemakerState.POWER_ON)
+            else:
+                logger.info("Starting ice making (no priming)")
+                self._fsm.context.chill_mode = "prechill"
+                self._fsm.context.cycle_start_time = datetime.now()
+                return await self._fsm.transition_to(IcemakerState.CHILL)
 
-        Can be called from CHILL, ICE, HEAT, or IDLE states.
-        Use start_cycle() to begin a new cycle from STANDBY.
+        # From STANDBY or IDLE: start cycle directly
+        if self._fsm.state in {IcemakerState.STANDBY, IcemakerState.IDLE}:
+            self._fsm.context.chill_mode = "prechill"
+            self._fsm.context.cycle_start_time = datetime.now()
+            return await self._fsm.transition_to(IcemakerState.CHILL)
 
-        Returns:
-            True if stopped, False if not in an active cycle state.
-        """
-        active_states = {
-            IcemakerState.CHILL,
-            IcemakerState.ICE,
-            IcemakerState.HEAT,
-            IcemakerState.IDLE,
-        }
-        if self._fsm.state not in active_states:
-            return False
-        return await self._fsm.transition_to(IcemakerState.STANDBY)
+        return False
 
     async def emergency_stop(self) -> None:
         """Emergency stop - turn off all relays and go to OFF."""
         await self._all_relays_off()
+        # Clear ice making flag so we don't auto-resume after power loss
+        self._set_ice_making_flag(False)
         # Force transition to OFF
         self._fsm._state = IcemakerState.OFF
         await self._fsm._emit_event(Event(
@@ -573,9 +453,13 @@ class IcemakerController:
         """Handle OFF state - system powered off."""
         # Clear shutdown flag since we've reached OFF
         self._shutdown_requested = False
+        # Clear ice making flag so we don't auto-resume on reboot
+        self._set_ice_making_flag(False)
+        # Clear chill mode so it doesn't show in the UI
+        ctx.chill_mode = None
         # Ensure all relays are off
         await self._all_relays_off()
-        # Wait for explicit power_on() call
+        # Wait for explicit start_icemaking() call
         return None
 
     async def _handle_standby(
@@ -586,7 +470,7 @@ class IcemakerController:
         """Handle STANDBY state - powered on, waiting for manual start.
 
         Unlike IDLE, STANDBY does NOT auto-restart when bin empties.
-        User must explicitly call start_cycle() to begin ice making.
+        User must explicitly call start_icemaking() to begin ice making.
 
         Ice cutter stays ON during standby to ensure any remaining ice is cut.
         Auto-transitions to OFF after standby_timeout if shutdown was requested.
@@ -611,7 +495,7 @@ class IcemakerController:
             self._shutdown_requested = False  # Clear flag
             return IcemakerState.OFF
 
-        # Wait for explicit start_cycle() or power_off() call
+        # Wait for explicit start_icemaking() or power_off() call
         return None
 
     async def _handle_idle(
@@ -681,9 +565,11 @@ class IcemakerController:
             await self._set_relay(RelayName.WATER_VALVE, True)
             return None
 
-        # Done - transition to STANDBY (ready for user to start cycle)
+        # Done - transition directly to CHILL to start ice making
         await self._set_relay(RelayName.WATER_VALVE, False)
-        return IcemakerState.STANDBY
+        ctx.chill_mode = "prechill"
+        ctx.cycle_start_time = datetime.now()
+        return IcemakerState.CHILL
 
     async def _handle_chill(
         self,

@@ -94,32 +94,20 @@ async def control_cycle():
     data = await request.get_json()
     command = CycleCommand(action=data.get("action", ""))
 
-    if command.action == "power_on":
-        success = await state.controller.power_on()
+    if command.action == "start":
+        success = await state.controller.start_icemaking()
         if not success:
-            abort(400, description="Cannot power on - not in OFF state")
-        return {"success": True, "message": "Power on initiated"}
-
-    elif command.action == "power_off":
-        success = await state.controller.power_off()
-        if not success:
-            abort(400, description="Cannot power off from current state")
-        # Check if graceful shutdown was initiated (cycle in progress)
-        if state.controller.shutdown_requested:
-            return {"success": True, "message": "Graceful shutdown initiated - will complete cycle then power off"}
-        return {"success": True, "message": "Powered off"}
-
-    elif command.action == "start":
-        success = await state.controller.start_cycle()
-        if not success:
-            abort(400, description="Cannot start cycle - not in IDLE state")
-        return {"success": True, "message": "Cycle started"}
+            abort(400, description="Cannot start - not in OFF, STANDBY, or IDLE state")
+        return {"success": True, "message": "Ice making started"}
 
     elif command.action == "stop":
-        success = await state.controller.stop_cycle()
+        success = await state.controller.power_off()
         if not success:
-            abort(400, description="Cannot stop cycle - not in an active cycle state")
-        return {"success": True, "message": "Cycle stopped"}
+            abort(400, description="Cannot stop from current state")
+        # Check if graceful shutdown was initiated (cycle in progress)
+        if state.controller.shutdown_requested:
+            return {"success": True, "message": "Stopping - will complete current cycle first"}
+        return {"success": True, "message": "Ice making stopped"}
 
     elif command.action == "emergency_stop":
         await state.controller.emergency_stop()

@@ -40,28 +40,14 @@ export async function fetchConfig(): Promise<IcemakerConfig> {
   return fetchJson<IcemakerConfig>(`${API_BASE}/config/`);
 }
 
-export async function powerOn(): Promise<{ success: boolean; message: string }> {
-  return fetchJson(`${API_BASE}/state/cycle`, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'power_on' }),
-  });
-}
-
-export async function powerOff(): Promise<{ success: boolean; message: string }> {
-  return fetchJson(`${API_BASE}/state/cycle`, {
-    method: 'POST',
-    body: JSON.stringify({ action: 'power_off' }),
-  });
-}
-
-export async function startCycle(): Promise<{ success: boolean; message: string }> {
+export async function startIcemaking(): Promise<{ success: boolean; message: string }> {
   return fetchJson(`${API_BASE}/state/cycle`, {
     method: 'POST',
     body: JSON.stringify({ action: 'start' }),
   });
 }
 
-export async function stopCycle(): Promise<{ success: boolean; message: string }> {
+export async function stopIcemaking(): Promise<{ success: boolean; message: string }> {
   return fetchJson(`${API_BASE}/state/cycle`, {
     method: 'POST',
     body: JSON.stringify({ action: 'stop' }),

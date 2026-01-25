@@ -52,13 +52,13 @@ class TestControllerInitialization:
         )
 
         await controller.initialize()
-        assert controller.fsm.state == IcemakerState.IDLE
+        assert controller.fsm.state == IcemakerState.OFF
 
     @pytest.mark.asyncio
-    async def test_controller_starts_in_idle(
+    async def test_controller_starts_in_off(
         self, fast_config: IcemakerConfig
     ) -> None:
-        """Controller should start in IDLE state."""
+        """Controller should start in OFF state."""
         gpio, sensors, model = create_simulated_hal()
         controller = IcemakerController(
             config=fast_config,
@@ -68,7 +68,7 @@ class TestControllerInitialization:
         )
 
         await controller.initialize()
-        assert controller.fsm.state == IcemakerState.IDLE
+        assert controller.fsm.state == IcemakerState.OFF
         await controller.stop()
 
 
@@ -76,10 +76,10 @@ class TestControllerCycleControl:
     """Test cycle start/stop functionality."""
 
     @pytest.mark.asyncio
-    async def test_start_cycle_from_idle(
+    async def test_start_icemaking_from_off(
         self, fast_config: IcemakerConfig
     ) -> None:
-        """Should be able to start cycle from IDLE."""
+        """Should be able to start ice making from OFF."""
         gpio, sensors, model = create_simulated_hal()
         controller = IcemakerController(
             config=fast_config,
@@ -89,17 +89,17 @@ class TestControllerCycleControl:
         )
 
         await controller.initialize()
-        success = await controller.start_cycle()
+        success = await controller.start_icemaking()
 
         assert success
         assert controller.fsm.state == IcemakerState.CHILL
         await controller.stop()
 
     @pytest.mark.asyncio
-    async def test_start_cycle_fails_when_not_idle(
+    async def test_start_icemaking_fails_when_already_running(
         self, fast_config: IcemakerConfig
     ) -> None:
-        """Should not be able to start cycle when not in IDLE."""
+        """Should not be able to start ice making when already running."""
         gpio, sensors, model = create_simulated_hal()
         controller = IcemakerController(
             config=fast_config,
@@ -109,16 +109,16 @@ class TestControllerCycleControl:
         )
 
         await controller.initialize()
-        await controller.start_cycle()  # Now in CHILL
+        await controller.start_icemaking()  # Now in CHILL
 
         # Try to start again
-        success = await controller.start_cycle()
+        success = await controller.start_icemaking()
         assert not success
         await controller.stop()
 
     @pytest.mark.asyncio
     async def test_emergency_stop(self, fast_config: IcemakerConfig) -> None:
-        """Emergency stop should turn off all relays and go to IDLE."""
+        """Emergency stop should turn off all relays and go to OFF."""
         gpio, sensors, model = create_simulated_hal()
         controller = IcemakerController(
             config=fast_config,
@@ -128,7 +128,7 @@ class TestControllerCycleControl:
         )
 
         await controller.initialize()
-        await controller.start_cycle()
+        await controller.start_icemaking()
 
         # Turn on some relays
         await gpio.set_relay(RelayName.COMPRESSOR_1, True)
@@ -136,7 +136,7 @@ class TestControllerCycleControl:
 
         await controller.emergency_stop()
 
-        assert controller.fsm.state == IcemakerState.IDLE
+        assert controller.fsm.state == IcemakerState.OFF
 
         # All relays should be off
         states = await gpio.get_all_relays()
@@ -163,7 +163,7 @@ class TestChillState:
         )
 
         await controller.initialize()
-        await controller.start_cycle()
+        await controller.start_icemaking()
 
         # Run one iteration of CHILL handler
         await controller._handle_chill(controller.fsm, controller.fsm.context)
@@ -235,7 +235,7 @@ class TestSimulatedCycle:
         await model.start(update_interval=0.01)
 
         # Start cycle (CHILL)
-        await controller.start_cycle()
+        await controller.start_icemaking()
         assert controller.fsm.state == IcemakerState.CHILL
 
         # Simulate reaching target temperature directly

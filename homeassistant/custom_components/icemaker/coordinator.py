@@ -89,7 +89,7 @@ class IcemakerApiClient:
             response.raise_for_status()
             return await response.json()
 
-    async def start_cycle(self) -> bool:
+    async def start_icemaking(self) -> bool:
         """Start an ice-making cycle."""
         async with self._session.post(
             f"{self._base_url}/api/state/cycle",
@@ -99,7 +99,7 @@ class IcemakerApiClient:
             data = await response.json()
             return data.get("success", False)
 
-    async def stop_cycle(self) -> bool:
+    async def stop_icemaking(self) -> bool:
         """Stop the current ice-making cycle."""
         async with self._session.post(
             f"{self._base_url}/api/state/cycle",

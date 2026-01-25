@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { emergencyStop, powerOff, powerOn, startCycle, stopCycle, enterDiagnostic, exitDiagnostic } from '../api/client';
+import { emergencyStop, startIcemaking, stopIcemaking, enterDiagnostic, exitDiagnostic } from '../api/client';
 import type { IcemakerState, TemperatureReading } from '../types/icemaker';
 import { getRetentionHours, setRetentionHours } from '../hooks/useIcemakerState';
 import { Configuration } from './Configuration';
@@ -105,10 +105,8 @@ export function SettingsPanel({ isOpen, onClose, currentState, shutdownRequested
   const isError = currentState === 'ERROR';
   const isDiagnostic = currentState === 'DIAGNOSTIC';
 
-  const canPowerOn = isOff;
-  const canPowerOff = (isStandby || isIdle || isError || isInCycle) && !shutdownRequested;
-  const canStart = isStandby || isIdle;
-  const canStop = isInCycle || isIdle;
+  const canStart = isOff || isStandby || isIdle;
+  const canStop = (isStandby || isIdle || isError || isInCycle) && !shutdownRequested;
   const canEnterDiagnostic = isOff;
 
   return (
@@ -147,50 +145,37 @@ export function SettingsPanel({ isOpen, onClose, currentState, shutdownRequested
                 >
                   Exit Diagnostic Mode
                 </button>
-              ) : isOff ? (
+              ) : (
                 <>
-                  <button
-                    className="btn btn-success btn-block"
-                    onClick={() => handleAction(powerOn, 'Failed to power on')}
-                    disabled={!canPowerOn || isLoading}
-                  >
-                    {isLoading ? 'Powering On...' : 'Power On'}
-                  </button>
-                  <button
-                    className="btn btn-secondary btn-block"
-                    onClick={() => handleAction(enterDiagnostic, 'Failed to enter diagnostic mode')}
-                    disabled={!canEnterDiagnostic || isLoading}
-                  >
-                    Diagnostic Mode
-                  </button>
+                  {canStart && (
+                    <button
+                      className="btn btn-success btn-block"
+                      onClick={() => handleAction(startIcemaking, 'Failed to start ice making')}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Starting...' : 'Start Icemaking'}
+                    </button>
+                  )}
+                  {canStop && (
+                    <button
+                      className="btn btn-secondary btn-block"
+                      onClick={() => handleAction(stopIcemaking, 'Failed to stop ice making')}
+                      disabled={isLoading}
+                    >
+                      Stop Icemaking
+                    </button>
+                  )}
+                  {isOff && (
+                    <button
+                      className="btn btn-secondary btn-block"
+                      onClick={() => handleAction(enterDiagnostic, 'Failed to enter diagnostic mode')}
+                      disabled={!canEnterDiagnostic || isLoading}
+                    >
+                      Diagnostic Mode
+                    </button>
+                  )}
                 </>
-              ) : (
-                <button
-                  className="btn btn-secondary btn-block"
-                  onClick={() => handleAction(powerOff, 'Failed to power off')}
-                  disabled={!canPowerOff || isLoading}
-                >
-                  Power Off
-                </button>
               )}
-
-              {!isDiagnostic && !isOff && (isInCycle ? (
-                <button
-                  className="btn btn-warning btn-block"
-                  onClick={() => handleAction(stopCycle, 'Failed to stop cycle')}
-                  disabled={!canStop || isLoading}
-                >
-                  Stop Cycle
-                </button>
-              ) : (
-                <button
-                  className="btn btn-primary btn-block"
-                  onClick={() => handleAction(startCycle, 'Failed to start cycle')}
-                  disabled={!canStart || isLoading}
-                >
-                  {isLoading ? 'Starting...' : 'Start Cycle'}
-                </button>
-              ))}
 
               <button
                 className="btn btn-danger btn-block"
@@ -202,9 +187,9 @@ export function SettingsPanel({ isOpen, onClose, currentState, shutdownRequested
             </div>
 
             <p className="control-hint">
-              {isOff && 'System is off. Power on to initialize or enter diagnostic mode.'}
+              {isOff && 'System is off. Start icemaking or enter diagnostic mode.'}
               {currentState === 'POWER_ON' && 'Priming water system...'}
-              {isStandby && 'Ready. Start a cycle to begin making ice.'}
+              {isStandby && 'Ready to make ice.'}
               {isIdle && 'Paused (bin full). Auto-restarts when bin empties.'}
               {isInCycle && 'Cycle in progress.'}
               {isError && 'Error state. Use Emergency Stop to reset.'}

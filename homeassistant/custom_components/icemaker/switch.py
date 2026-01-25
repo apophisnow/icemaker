@@ -54,10 +54,10 @@ class IcemakerCycleSwitch(CoordinatorEntity[IcemakerCoordinator], SwitchEntity):
 
     async def async_turn_on(self, **kwargs) -> None:
         """Start the ice-making cycle."""
-        await self.coordinator.client.start_cycle()
+        await self.coordinator.client.start_icemaking()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs) -> None:
         """Stop the ice-making cycle."""
-        await self.coordinator.client.stop_cycle()
+        await self.coordinator.client.stop_icemaking()
         await self.coordinator.async_request_refresh()

@@ -69,7 +69,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         timeout_seconds=float("inf"),
         allowed_transitions=frozenset({
             IcemakerState.POWER_ON,
-            IcemakerState.STANDBY,  # Direct power on when skipping priming
+            IcemakerState.CHILL,  # Direct start when skipping priming
             IcemakerState.SHUTDOWN,
             IcemakerState.DIAGNOSTIC,  # Enter diagnostic mode
         }),
@@ -97,7 +97,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         target_temp=None,
         timeout_seconds=120,  # 2 minutes for startup sequence
         allowed_transitions=frozenset({
-            IcemakerState.STANDBY,  # Goes to STANDBY for manual start
+            IcemakerState.CHILL,  # Starts ice making after priming
             IcemakerState.ERROR,
             IcemakerState.SHUTDOWN,
         }),
