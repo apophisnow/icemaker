@@ -197,10 +197,10 @@ def create_app() -> Quart:
     # CORS configuration for frontend
     # Allow all origins - frontend may be accessed from various IPs
     # (e.g., accessing Pi from local network)
+    # Note: credentials not needed since frontend is served from same origin
     app = cors(
         app,
         allow_origin="*",
-        allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
