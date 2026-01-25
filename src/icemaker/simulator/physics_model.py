@@ -51,11 +51,11 @@ class SimulatorParams:
     - Plate continues to cool as ice builds, dropping below 32°F
     - Plate temperature indicates ice thickness (colder = thicker ice)
 
-    Default values are tuned so that:
-    - Prechill (70°F -> 32°F): ~100s (timeout 120s)
-    - Ice making (ice builds, plate drops to -2°F): ~1200s (timeout 1500s)
-    - Harvest (-2°F -> 38°F): ~180s (timeout 240s)
-    - Rechill (38°F -> 35°F): ~10s (timeout 300s)
+    Default values calibrated from real hardware data (2026-01-25):
+    - Observed cooling rate: ~3.4°F/min (0.057°F/s)
+    - Observed heating rate: ~24.9°F/min (0.415°F/s)
+    - Full cooling cycle (54°F → -2°F): ~875s
+    - Harvest heating (-2°F → 40°F): ~104s
     """
 
     # Temperatures (°F)
@@ -66,13 +66,14 @@ class SimulatorParams:
     freezing_point_f: float = 32.0  # Water freezing point
 
     # Heat transfer coefficients (W/m²·K)
-    # Tuned for realistic cycle times with 0.5kg plate
+    # Calibrated from real hardware data using extract_sim_params.py
     #
     # Refrigerant evaporator to plate - main cooling
-    # Real evaporators: 1000-5000 W/(m²·K), but small contact area
-    h_refrigerant: float = 350.0
+    # Fitted from observed cooling rate of 0.057°F/s
+    h_refrigerant: float = 60.0
     # Hot gas to plate - heating during harvest
-    h_hotgas: float = 80.0
+    # Fitted from observed heating rate of 0.415°F/s
+    h_hotgas: float = 155.0
     # Forced convection of water over plate (no ice)
     # Water flowing over cold plate with recirculation pump
     # Higher value for turbulent flow: 500-2000 W/(m²·K)
@@ -104,8 +105,8 @@ class SimulatorParams:
     reservoir_volume_liters: float = 1.0
     reservoir_max_volume_liters: float = 1.5
 
-    # Plate parameters - lighter plate responds faster
-    plate_mass_kg: float = 0.5  # Aluminum plate mass
+    # Plate parameters - calibrated from real hardware thermal response
+    plate_mass_kg: float = 1.0  # Aluminum plate mass (fitted from data)
 
     # Speed multiplier for accelerated simulation
     speed_multiplier: float = 1.0
