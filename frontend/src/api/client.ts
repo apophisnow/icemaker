@@ -114,6 +114,12 @@ export async function updateConfig(
   });
 }
 
+export async function resetConfig(): Promise<IcemakerConfig> {
+  return fetchJson(`${API_BASE}/config/reset`, {
+    method: 'POST',
+  });
+}
+
 export async function transitionState(
   targetState: string,
   force = false

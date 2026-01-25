@@ -160,7 +160,10 @@ def load_config(
         config = _merge_yaml(config, env_config_path)
         logger.debug("Loaded %s config from %s", env, env_config_path)
 
-    # Override with environment variables
+    # Load runtime config (user-modified settings) if it exists
+    config = load_runtime_config(config)
+
+    # Override with environment variables (highest priority)
     config = _apply_env_overrides(config)
 
     logger.info("Configuration loaded for environment: %s", env)
@@ -257,3 +260,110 @@ def _apply_env_overrides(config: IcemakerConfig) -> IcemakerConfig:
 def _parse_bool(value: str) -> bool:
     """Parse boolean from string."""
     return value.lower() in ("true", "1", "yes", "on")
+
+
+def get_runtime_config_path(data_dir: str = "data") -> Path:
+    """Get path to the runtime configuration file.
+
+    Args:
+        data_dir: Data directory path.
+
+    Returns:
+        Path to runtime_config.yaml
+    """
+    path = Path(data_dir)
+    path.mkdir(parents=True, exist_ok=True)
+    return path / "runtime_config.yaml"
+
+
+def save_runtime_config(config: IcemakerConfig, data_dir: str | None = None) -> None:
+    """Save user-modifiable configuration to runtime config file.
+
+    Only saves settings that users can modify via the API, not hardware
+    IDs, API settings, or simulation settings.
+
+    Args:
+        config: Current configuration to save.
+        data_dir: Data directory path. Uses config.data_dir if None.
+    """
+    if data_dir is None:
+        data_dir = config.data_dir
+
+    runtime_data = {
+        "states": {
+            "prechill": {
+                "target_temp": config.prechill.target_temp,
+                "timeout_seconds": config.prechill.timeout_seconds,
+            },
+            "ice_making": {
+                "target_temp": config.ice_making.target_temp,
+                "timeout_seconds": config.ice_making.timeout_seconds,
+            },
+            "harvest": {
+                "target_temp": config.harvest.target_temp,
+                "timeout_seconds": config.harvest.timeout_seconds,
+            },
+            "rechill": {
+                "target_temp": config.rechill.target_temp,
+                "timeout_seconds": config.rechill.timeout_seconds,
+            },
+        },
+        "thresholds": {
+            "bin_full": config.bin_full_threshold,
+        },
+        "startup": {
+            "priming_enabled": config.priming_enabled,
+        },
+    }
+
+    path = get_runtime_config_path(data_dir)
+    try:
+        with open(path, "w") as f:
+            yaml.safe_dump(runtime_data, f, default_flow_style=False)
+        logger.info("Saved runtime config to %s", path)
+    except OSError as e:
+        logger.error("Failed to save runtime config: %s", e)
+
+
+def load_runtime_config(config: IcemakerConfig) -> IcemakerConfig:
+    """Load and apply runtime configuration if it exists.
+
+    Args:
+        config: Base configuration to apply runtime settings to.
+
+    Returns:
+        Configuration with runtime settings applied.
+    """
+    path = get_runtime_config_path(config.data_dir)
+    if not path.exists():
+        logger.debug("No runtime config found at %s", path)
+        return config
+
+    try:
+        config = _merge_yaml(config, path)
+        logger.info("Loaded runtime config from %s", path)
+    except (OSError, yaml.YAMLError) as e:
+        logger.warning("Failed to load runtime config: %s", e)
+
+    return config
+
+
+def reset_to_factory_defaults(data_dir: str = "data") -> bool:
+    """Reset configuration to factory defaults by removing runtime config.
+
+    Args:
+        data_dir: Data directory path.
+
+    Returns:
+        True if reset successful, False if no runtime config existed.
+    """
+    path = get_runtime_config_path(data_dir)
+    if path.exists():
+        try:
+            path.unlink()
+            logger.info("Reset to factory defaults - removed %s", path)
+            return True
+        except OSError as e:
+            logger.error("Failed to remove runtime config: %s", e)
+            return False
+    return False

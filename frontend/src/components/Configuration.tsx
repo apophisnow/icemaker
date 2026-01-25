@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import {
   fetchConfig,
   fetchSimulatorStatus,
+  resetConfig,
   resetSimulator,
   setSimulatorSpeed,
   updateConfig,
@@ -71,6 +72,7 @@ export function Configuration() {
   const [pendingChanges, setPendingChanges] = useState<Partial<IcemakerConfig>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const { unit, convertTemp } = useTemperature();
@@ -119,6 +121,24 @@ export function Configuration() {
 
   const handleReset = () => {
     setPendingChanges({});
+  };
+
+  const handleFactoryReset = async () => {
+    if (!confirm('Reset all settings to factory defaults? This cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setIsResetting(true);
+      setError(null);
+      const factoryConfig = await resetConfig();
+      setConfig(factoryConfig);
+      setPendingChanges({});
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to reset to factory defaults');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   const handleSpeedChange = async (speed: number) => {
@@ -349,6 +369,14 @@ export function Configuration() {
                 {(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'Enabled' : 'Disabled'}
               </button>
             </div>
+            <button
+              className="btn btn-warning btn-block btn-sm"
+              onClick={handleFactoryReset}
+              disabled={isResetting || isSaving}
+              style={{ marginTop: '0.75rem' }}
+            >
+              {isResetting ? 'Resetting...' : 'Reset to Factory Defaults'}
+            </button>
           </div>
 
           {hasChanges && (

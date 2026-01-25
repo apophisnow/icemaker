@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from quart import Blueprint, abort, request
 
+from ...config import load_config, reset_to_factory_defaults, save_runtime_config
 from ..schemas import ConfigResponse, ConfigUpdate
 
 if TYPE_CHECKING:
@@ -48,11 +49,7 @@ async def get_config():
 
 @bp.route("/", methods=["PUT"])
 async def update_config():
-    """Update configuration.
-
-    Note: Changes are applied to the running controller but not
-    persisted to configuration files.
-    """
+    """Update configuration and persist to runtime config file."""
     state = get_app_state()
     if state.controller is None:
         abort(503, description="Controller not initialized")
@@ -94,6 +91,55 @@ async def update_config():
         config.bin_full_threshold = update.bin_full_threshold
     if update.priming_enabled is not None:
         config.priming_enabled = update.priming_enabled
+
+    # Persist changes to runtime config file
+    save_runtime_config(config)
+
+    return asdict(ConfigResponse(
+        prechill_temp=config.prechill.target_temp,
+        prechill_timeout=config.prechill.timeout_seconds,
+        ice_target_temp=config.ice_making.target_temp,
+        ice_timeout=config.ice_making.timeout_seconds,
+        harvest_threshold=config.harvest.target_temp,
+        harvest_timeout=config.harvest.timeout_seconds,
+        rechill_temp=config.rechill.target_temp,
+        rechill_timeout=config.rechill.timeout_seconds,
+        bin_full_threshold=config.bin_full_threshold,
+        poll_interval=config.poll_interval,
+        use_simulator=config.use_simulator,
+        priming_enabled=config.priming_enabled,
+    ))
+
+
+@bp.route("/reset", methods=["POST"])
+async def reset_config():
+    """Reset configuration to factory defaults.
+
+    Removes the runtime config file and reloads factory defaults.
+    """
+    state = get_app_state()
+    if state.controller is None:
+        abort(503, description="Controller not initialized")
+
+    config = state.controller.config
+
+    # Remove runtime config file
+    reset_to_factory_defaults(config.data_dir)
+
+    # Reload factory defaults (without runtime config overlay)
+    factory_config = load_config()
+
+    # Apply factory settings to running config (user-modifiable settings only)
+    config.prechill.target_temp = factory_config.prechill.target_temp
+    config.prechill.timeout_seconds = factory_config.prechill.timeout_seconds
+    config.ice_making.target_temp = factory_config.ice_making.target_temp
+    config.ice_making.timeout_seconds = factory_config.ice_making.timeout_seconds
+    config.harvest.target_temp = factory_config.harvest.target_temp
+    config.harvest.timeout_seconds = factory_config.harvest.timeout_seconds
+    config.rechill.target_temp = factory_config.rechill.target_temp
+    config.rechill.timeout_seconds = factory_config.rechill.timeout_seconds
+    config.bin_full_threshold = factory_config.bin_full_threshold
+    config.priming_enabled = factory_config.priming_enabled
 
     return asdict(ConfigResponse(
         prechill_temp=config.prechill.target_temp,
