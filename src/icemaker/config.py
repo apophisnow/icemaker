@@ -48,7 +48,21 @@ class StateConfig:
 
     target_temp: float
     timeout_seconds: int
-    refill_time_seconds: int | None = None
+
+
+@dataclass
+class PrimingConfig:
+    """Configuration for the water priming sequence.
+
+    The priming sequence runs in 3 phases:
+    1. Water valve open (flush/rinse lines)
+    2. Recirculating pump on (prime pump)
+    3. Water valve open (fill reservoir)
+    """
+
+    flush_time_seconds: int = 60  # Phase 1: Flush/rinse water lines
+    pump_time_seconds: int = 15   # Phase 2: Prime the pump
+    fill_time_seconds: int = 15   # Phase 3: Fill reservoir (also used during harvest)
 
 
 @dataclass
@@ -67,7 +81,7 @@ class IcemakerConfig:
         default_factory=lambda: StateConfig(target_temp=-2.0, timeout_seconds=1500)
     )
     harvest: StateConfig = field(
-        default_factory=lambda: StateConfig(target_temp=38.0, timeout_seconds=240, refill_time_seconds = 18)
+        default_factory=lambda: StateConfig(target_temp=38.0, timeout_seconds=240)
     )
     rechill: StateConfig = field(
         default_factory=lambda: StateConfig(target_temp=35.0, timeout_seconds=300)
@@ -100,6 +114,7 @@ class IcemakerConfig:
 
     # Startup options
     priming_enabled: bool = False  # Run water priming on power on (default: disabled)
+    priming: PrimingConfig = field(default_factory=PrimingConfig)
 
     # Data directory for persistent storage (cycle count, etc.)
     data_dir: str = "data"
@@ -216,6 +231,13 @@ def _merge_yaml(config: IcemakerConfig, path: Path) -> IcemakerConfig:
     if "startup" in data:
         startup = data["startup"]
         config.priming_enabled = startup.get("priming_enabled", config.priming_enabled)
+        if "priming" in startup:
+            priming = startup["priming"]
+            config.priming.flush_time_seconds = priming.get("flush_time_seconds", config.priming.flush_time_seconds)
+            config.priming.pump_time_seconds = priming.get("pump_time_seconds", config.priming.pump_time_seconds)
+            config.priming.fill_time_seconds = priming.get("fill_time_seconds", config.priming.fill_time_seconds)
+
+    config.standby_timeout = data.get("standby_timeout", config.standby_timeout)
 
     return config
 
@@ -229,7 +251,6 @@ def _apply_env_overrides(config: IcemakerConfig) -> IcemakerConfig:
         "ICEMAKER_ICE_TIMEOUT": ("ice_making", "timeout_seconds", int),
         "ICEMAKER_HARVEST_TEMP": ("harvest", "target_temp", float),
         "ICEMAKER_HARVEST_TIMEOUT": ("harvest", "timeout_seconds", int),
-        "ICEMAKER_HARVEST_REFILL_TIME": ("harvest", "refill_time_seconds", int),
         "ICEMAKER_RECHILL_TEMP": ("rechill", "target_temp", float),
         "ICEMAKER_RECHILL_TIMEOUT": ("rechill", "timeout_seconds", int),
         "ICEMAKER_BIN_THRESHOLD": ("bin_full_threshold", None, float),
@@ -238,7 +259,11 @@ def _apply_env_overrides(config: IcemakerConfig) -> IcemakerConfig:
         "ICEMAKER_API_PORT": ("api_port", None, int),
         "ICEMAKER_LOG_LEVEL": ("log_level", None, str),
         "ICEMAKER_POLL_INTERVAL": ("poll_interval", None, float),
+        "ICEMAKER_STANDBY_TIMEOUT": ("standby_timeout", None, float),
         "ICEMAKER_PRIMING_ENABLED": ("priming_enabled", None, _parse_bool),
+        "ICEMAKER_PRIMING_FLUSH_TIME": ("priming", "flush_time_seconds", int),
+        "ICEMAKER_PRIMING_PUMP_TIME": ("priming", "pump_time_seconds", int),
+        "ICEMAKER_PRIMING_FILL_TIME": ("priming", "fill_time_seconds", int),
     }
 
     for env_var, (attr, sub_attr, converter) in env_map.items():
@@ -313,7 +338,13 @@ def save_runtime_config(config: IcemakerConfig, data_dir: str | None = None) -> 
         },
         "startup": {
             "priming_enabled": config.priming_enabled,
+            "priming": {
+                "flush_time_seconds": config.priming.flush_time_seconds,
+                "pump_time_seconds": config.priming.pump_time_seconds,
+                "fill_time_seconds": config.priming.fill_time_seconds,
+            },
         },
+        "standby_timeout": config.standby_timeout,
     }
 
     path = get_runtime_config_path(data_dir)

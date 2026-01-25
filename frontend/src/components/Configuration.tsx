@@ -336,6 +336,62 @@ export function Configuration() {
                 onChange={(v) => handleChange('rechill_timeout', v)}
                 disabled={isSaving}
               />
+              <ConfigField
+                label="Standby Timeout"
+                value={getValue('standby_timeout')}
+                unit="sec"
+                min={60}
+                max={3600}
+                step={60}
+                onChange={(v) => handleChange('standby_timeout', v)}
+                disabled={isSaving}
+              />
+            </div>
+          </div>
+
+          <div className="config-section">
+            <h4>Priming</h4>
+            <div className="config-toggle-field">
+              <label className="config-label">Priming on Power On</label>
+              <button
+                className={`toggle-btn ${(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'active' : ''}`}
+                onClick={() => handleChange('priming_enabled', !(pendingChanges.priming_enabled ?? config?.priming_enabled))}
+                disabled={isSaving}
+              >
+                {(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'Enabled' : 'Disabled'}
+              </button>
+            </div>
+            <div className="config-grid">
+              <ConfigField
+                label="Flush Time"
+                value={getValue('priming_flush_time')}
+                unit="sec"
+                min={5}
+                max={300}
+                step={5}
+                onChange={(v) => handleChange('priming_flush_time', v)}
+                disabled={isSaving}
+              />
+              <ConfigField
+                label="Pump Time"
+                value={getValue('priming_pump_time')}
+                unit="sec"
+                min={5}
+                max={120}
+                step={5}
+                onChange={(v) => handleChange('priming_pump_time', v)}
+                disabled={isSaving}
+              />
+              <ConfigField
+                label="Fill Time"
+                value={getValue('priming_fill_time')}
+                unit="sec"
+                min={5}
+                max={120}
+                step={5}
+                onChange={(v) => handleChange('priming_fill_time', v)}
+                disabled={isSaving}
+              />
             </div>
           </div>
 
@@ -358,16 +414,6 @@ export function Configuration() {
               <span className={`config-simulator-value ${config?.use_simulator ? 'enabled' : 'disabled'}`}>
                 {config?.use_simulator ? 'Enabled' : 'Disabled'}
               </span>
-            </div>
-            <div className="config-toggle-field">
-              <label className="config-label">Priming on Power On</label>
-              <button
-                className={`toggle-btn ${(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'active' : ''}`}
-                onClick={() => handleChange('priming_enabled', !(pendingChanges.priming_enabled ?? config?.priming_enabled))}
-                disabled={isSaving}
-              >
-                {(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'Enabled' : 'Disabled'}
-              </button>
             </div>
             <button
               className="btn btn-warning btn-block btn-sm"

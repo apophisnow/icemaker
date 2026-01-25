@@ -42,8 +42,12 @@ async def get_config():
         rechill_timeout=config.rechill.timeout_seconds,
         bin_full_threshold=config.bin_full_threshold,
         poll_interval=config.poll_interval,
+        standby_timeout=config.standby_timeout,
         use_simulator=config.use_simulator,
         priming_enabled=config.priming_enabled,
+        priming_flush_time=config.priming.flush_time_seconds,
+        priming_pump_time=config.priming.pump_time_seconds,
+        priming_fill_time=config.priming.fill_time_seconds,
     ))
 
 
@@ -65,7 +69,11 @@ async def update_config():
         rechill_temp=data.get("rechill_temp"),
         rechill_timeout=data.get("rechill_timeout"),
         bin_full_threshold=data.get("bin_full_threshold"),
+        standby_timeout=data.get("standby_timeout"),
         priming_enabled=data.get("priming_enabled"),
+        priming_flush_time=data.get("priming_flush_time"),
+        priming_pump_time=data.get("priming_pump_time"),
+        priming_fill_time=data.get("priming_fill_time"),
     )
 
     config = state.controller.config
@@ -89,8 +97,16 @@ async def update_config():
         config.rechill.timeout_seconds = update.rechill_timeout
     if update.bin_full_threshold is not None:
         config.bin_full_threshold = update.bin_full_threshold
+    if update.standby_timeout is not None:
+        config.standby_timeout = update.standby_timeout
     if update.priming_enabled is not None:
         config.priming_enabled = update.priming_enabled
+    if update.priming_flush_time is not None:
+        config.priming.flush_time_seconds = update.priming_flush_time
+    if update.priming_pump_time is not None:
+        config.priming.pump_time_seconds = update.priming_pump_time
+    if update.priming_fill_time is not None:
+        config.priming.fill_time_seconds = update.priming_fill_time
 
     # Persist changes to runtime config file
     save_runtime_config(config)
@@ -106,8 +122,12 @@ async def update_config():
         rechill_timeout=config.rechill.timeout_seconds,
         bin_full_threshold=config.bin_full_threshold,
         poll_interval=config.poll_interval,
+        standby_timeout=config.standby_timeout,
         use_simulator=config.use_simulator,
         priming_enabled=config.priming_enabled,
+        priming_flush_time=config.priming.flush_time_seconds,
+        priming_pump_time=config.priming.pump_time_seconds,
+        priming_fill_time=config.priming.fill_time_seconds,
     ))
 
 
@@ -139,7 +159,11 @@ async def reset_config():
     config.rechill.target_temp = factory_config.rechill.target_temp
     config.rechill.timeout_seconds = factory_config.rechill.timeout_seconds
     config.bin_full_threshold = factory_config.bin_full_threshold
+    config.standby_timeout = factory_config.standby_timeout
     config.priming_enabled = factory_config.priming_enabled
+    config.priming.flush_time_seconds = factory_config.priming.flush_time_seconds
+    config.priming.pump_time_seconds = factory_config.priming.pump_time_seconds
+    config.priming.fill_time_seconds = factory_config.priming.fill_time_seconds
 
     return asdict(ConfigResponse(
         prechill_temp=config.prechill.target_temp,
@@ -152,6 +176,10 @@ async def reset_config():
         rechill_timeout=config.rechill.timeout_seconds,
         bin_full_threshold=config.bin_full_threshold,
         poll_interval=config.poll_interval,
+        standby_timeout=config.standby_timeout,
         use_simulator=config.use_simulator,
         priming_enabled=config.priming_enabled,
+        priming_flush_time=config.priming.flush_time_seconds,
+        priming_pump_time=config.priming.pump_time_seconds,
+        priming_fill_time=config.priming.fill_time_seconds,
     ))

@@ -649,27 +649,32 @@ class IcemakerController:
     ) -> Optional[IcemakerState]:
         """Handle POWER_ON state - prime water system.
 
-        Follows original code's startup sequence:
-        1. Water valve ON for 1 minute
-        2. Recirculating pump ON for 15 seconds
-        3. Water valve ON for 15 seconds
+        Runs the priming sequence in 3 configurable phases:
+        1. Water valve ON (flush/rinse lines)
+        2. Recirculating pump ON (prime pump)
+        3. Water valve ON (fill reservoir)
         """
         elapsed = fsm.time_in_state()
+        priming = self.config.priming
 
-        # Phase 1: Water valve (0-60s)
-        if elapsed < 60:
+        phase1_end = priming.flush_time_seconds
+        phase2_end = phase1_end + priming.pump_time_seconds
+        phase3_end = phase2_end + priming.fill_time_seconds
+
+        # Phase 1: Flush/rinse water lines
+        if elapsed < phase1_end:
             await self._set_relay(RelayName.WATER_VALVE, True)
             await self._set_relay(RelayName.RECIRCULATING_PUMP, False)
             return None
 
-        # Phase 2: Pump priming (60-75s)
-        if elapsed < 75:
+        # Phase 2: Prime the pump
+        if elapsed < phase2_end:
             await self._set_relay(RelayName.WATER_VALVE, False)
             await self._set_relay(RelayName.RECIRCULATING_PUMP, True)
             return None
 
-        # Phase 3: Final water fill (75-90s)
-        if elapsed < 90:
+        # Phase 3: Fill reservoir
+        if elapsed < phase3_end:
             await self._set_relay(RelayName.RECIRCULATING_PUMP, False)
             await self._set_relay(RelayName.WATER_VALVE, True)
             return None

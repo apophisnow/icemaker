@@ -110,7 +110,6 @@ export function SettingsPanel({ isOpen, onClose, currentState, shutdownRequested
   const canStart = isStandby || isIdle;
   const canStop = isInCycle || isIdle;
   const canEnterDiagnostic = isOff;
-  const canExitDiagnostic = isDiagnostic;
 
   return (
     <>

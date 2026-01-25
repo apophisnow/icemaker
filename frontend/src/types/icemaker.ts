@@ -65,8 +65,12 @@ export interface IcemakerConfig {
   rechill_timeout: number;
   bin_full_threshold: number;
   poll_interval: number;
+  standby_timeout: number;
   use_simulator: boolean;
   priming_enabled: boolean;
+  priming_flush_time: number;
+  priming_pump_time: number;
+  priming_fill_time: number;
 }
 
 export interface StateUpdateData {
