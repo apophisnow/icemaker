@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
+from typing import Any, Optional
 
 from ..config import IcemakerConfig, load_config
 from ..hal.base import (
@@ -135,15 +137,180 @@ class IcemakerController:
         self._fsm.register_handler(IcemakerState.ERROR, self._handle_error)
         self._fsm.register_handler(IcemakerState.SHUTDOWN, self._handle_shutdown)
 
+        # Load persistent cycle count
+        self._load_cycle_count()
+
         logger.info("Controller initialized")
+
+    def _get_cycle_count_path(self) -> Path:
+        """Get path to the cycle count file."""
+        data_dir = Path(self.config.data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir / "cycle_count.txt"
+
+    def _load_cycle_count(self) -> None:
+        """Load lifetime cycle count from persistent storage."""
+        path = self._get_cycle_count_path()
+        try:
+            if path.exists():
+                count = int(path.read_text().strip())
+                self._fsm.context.cycle_count = count
+                logger.info("Loaded lifetime cycle count: %d", count)
+            else:
+                logger.info("No existing cycle count file, starting at 0")
+        except (ValueError, OSError) as e:
+            logger.warning("Failed to load cycle count: %s", e)
+
+    def _save_cycle_count(self) -> None:
+        """Save lifetime cycle count to persistent storage."""
+        path = self._get_cycle_count_path()
+        try:
+            path.write_text(str(self._fsm.context.cycle_count))
+            logger.debug("Saved cycle count: %d", self._fsm.context.cycle_count)
+        except OSError as e:
+            logger.warning("Failed to save cycle count: %s", e)
+
+    def _get_state_path(self) -> Path:
+        """Get path to the state persistence file."""
+        data_dir = Path(self.config.data_dir)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        return data_dir / "state.json"
+
+    async def _save_state(self) -> None:
+        """Save current state for graceful restart.
+
+        Saves FSM state, relay states, and context to enable
+        resuming operation after a restart without changing relay states.
+        """
+        if self._gpio is None:
+            return
+
+        path = self._get_state_path()
+        try:
+            relay_states = await self._gpio.get_all_relays()
+            ctx = self._fsm.context
+
+            state_data: dict[str, Any] = {
+                "version": 1,
+                "timestamp": datetime.now().isoformat(),
+                "fsm_state": self._fsm.state.value,
+                "previous_state": (
+                    self._fsm.previous_state.value if self._fsm.previous_state else None
+                ),
+                "relays": {name.value: on for name, on in relay_states.items()},
+                "context": {
+                    "plate_temp": ctx.plate_temp,
+                    "bin_temp": ctx.bin_temp,
+                    "target_temp": ctx.target_temp,
+                    "cycle_count": ctx.cycle_count,
+                    "chill_mode": ctx.chill_mode,
+                    "state_enter_time": ctx.state_enter_time.isoformat(),
+                    "cycle_start_time": (
+                        ctx.cycle_start_time.isoformat() if ctx.cycle_start_time else None
+                    ),
+                },
+            }
+
+            path.write_text(json.dumps(state_data, indent=2))
+            logger.info("Saved state for graceful restart: %s", self._fsm.state.name)
+        except (OSError, TypeError) as e:
+            logger.warning("Failed to save state: %s", e)
+
+    async def _load_and_restore_state(self) -> bool:
+        """Load and restore state from a previous run.
+
+        Restores relay states immediately to maintain hardware state,
+        then restores FSM state and context.
+
+        Returns:
+            True if state was restored, False if no valid state found.
+        """
+        path = self._get_state_path()
+        if not path.exists():
+            logger.info("No saved state found, starting fresh")
+            return False
+
+        try:
+            state_data = json.loads(path.read_text())
+
+            # Validate version
+            if state_data.get("version") != 1:
+                logger.warning("Unknown state file version, ignoring")
+                return False
+
+            # Restore relay states FIRST (before FSM runs)
+            if self._gpio is not None and "relays" in state_data:
+                for relay_name, on in state_data["relays"].items():
+                    try:
+                        relay = RelayName(relay_name)
+                        await self._gpio.set_relay(relay, on)
+                        logger.debug("Restored relay %s = %s", relay_name, on)
+                    except ValueError:
+                        logger.warning("Unknown relay in saved state: %s", relay_name)
+
+            # Restore FSM state
+            fsm_state_name = state_data.get("fsm_state")
+            if fsm_state_name:
+                try:
+                    restored_state = IcemakerState(fsm_state_name)
+                    self._fsm._state = restored_state
+                    logger.info("Restored FSM state: %s", restored_state.name)
+                except ValueError:
+                    logger.warning("Unknown FSM state in saved state: %s", fsm_state_name)
+
+            # Restore previous state
+            prev_state_name = state_data.get("previous_state")
+            if prev_state_name:
+                try:
+                    self._fsm._previous_state = IcemakerState(prev_state_name)
+                except ValueError:
+                    pass
+
+            # Restore context
+            ctx_data = state_data.get("context", {})
+            ctx = self._fsm.context
+            ctx.plate_temp = ctx_data.get("plate_temp", 70.0)
+            ctx.bin_temp = ctx_data.get("bin_temp", 70.0)
+            ctx.target_temp = ctx_data.get("target_temp", 32.0)
+            ctx.cycle_count = ctx_data.get("cycle_count", 0)
+            ctx.chill_mode = ctx_data.get("chill_mode")
+
+            if ctx_data.get("state_enter_time"):
+                ctx.state_enter_time = datetime.fromisoformat(ctx_data["state_enter_time"])
+            if ctx_data.get("cycle_start_time"):
+                ctx.cycle_start_time = datetime.fromisoformat(ctx_data["cycle_start_time"])
+
+            # Remove state file after successful restore
+            path.unlink()
+            logger.info("State restored successfully, removed state file")
+            return True
+
+        except (json.JSONDecodeError, OSError, KeyError) as e:
+            logger.warning("Failed to restore state: %s", e)
+            return False
+
+    def _clear_saved_state(self) -> None:
+        """Remove the saved state file (used after clean shutdown)."""
+        path = self._get_state_path()
+        try:
+            if path.exists():
+                path.unlink()
+        except OSError:
+            pass
 
     async def start(self) -> None:
         """Start the controller.
 
         Initializes hardware, starts the thermal model (if simulating),
         starts the sensor polling task, and runs the FSM.
+
+        If a previous graceful shutdown left a saved state, relay states
+        and FSM state will be restored automatically.
         """
         await self.initialize()
+
+        # Try to restore state from a previous graceful shutdown
+        restored = await self._load_and_restore_state()
 
         self._running = True
 
@@ -154,15 +321,31 @@ class IcemakerController:
         # Start sensor polling
         self._sensor_task = asyncio.create_task(self._poll_sensors())
 
+        if restored:
+            logger.info("Resuming from restored state: %s", self._fsm.state.name)
+
         # Run FSM (this blocks until stop() is called)
         await self._fsm.run()
 
-    async def stop(self) -> None:
-        """Stop the controller."""
+    async def stop(self, graceful: bool = False) -> None:
+        """Stop the controller.
+
+        Args:
+            graceful: If True, save state for restart without changing relays.
+                     If False (default), turn off all relays and do full shutdown.
+        """
+        if graceful:
+            # Save state BEFORE stopping anything
+            await self._save_state()
+            logger.info("Graceful shutdown: state saved, relays will be preserved on restart")
+
         self._running = False
 
-        # Stop FSM
-        await self._fsm.stop()
+        # Stop FSM (skip transition to SHUTDOWN in graceful mode)
+        if graceful:
+            self._fsm._running = False
+        else:
+            await self._fsm.stop()
 
         # Stop sensor polling
         if self._sensor_task is not None:
@@ -176,12 +359,18 @@ class IcemakerController:
         if self._thermal_model is not None:
             await self._thermal_model.stop()
 
-        # Turn off all relays
+        # Handle relays based on shutdown mode
         if self._gpio is not None:
-            await self._all_relays_off()
-            await self._gpio.cleanup()
+            if graceful:
+                # Don't turn off relays - just cleanup GPIO without state changes
+                await self._gpio.cleanup()
+            else:
+                # Full shutdown - turn off all relays
+                await self._all_relays_off()
+                await self._gpio.cleanup()
+                self._clear_saved_state()
 
-        logger.info("Controller stopped")
+        logger.info("Controller stopped (graceful=%s)", graceful)
 
     async def power_on(self, prime: bool | None = None) -> bool:
         """Power on the icemaker from OFF state.
@@ -457,6 +646,7 @@ class IcemakerController:
                 # Rechill complete - check bin and decide next action
                 ctx.chill_mode = None
                 ctx.cycle_count += 1
+                self._save_cycle_count()
                 if self._is_bin_full():
                     logger.info("Bin full (temp %.1f°F < %.1f°F), entering IDLE to wait",
                                 ctx.bin_temp, self.config.bin_full_threshold)
@@ -483,6 +673,7 @@ class IcemakerController:
             else:
                 ctx.chill_mode = None
                 ctx.cycle_count += 1
+                self._save_cycle_count()
                 if self._is_bin_full():
                     return IcemakerState.IDLE
                 # Start next cycle - transition to ICE state

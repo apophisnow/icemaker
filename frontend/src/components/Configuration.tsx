@@ -26,17 +26,36 @@ interface ConfigFieldProps {
 }
 
 function ConfigField({ label, value, unit, min, max, step, onChange, disabled }: ConfigFieldProps) {
+  // Use local state to allow intermediate input states like "-" or "-0"
+  const [inputValue, setInputValue] = useState(value.toString());
+
+  // Sync with external value changes
+  useEffect(() => {
+    setInputValue(value.toString());
+  }, [value]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setInputValue(raw);
+
+    // Only propagate valid numbers
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed)) {
+      onChange(parsed);
+    }
+  };
+
   return (
     <div className="config-field">
       <label className="config-label">{label}</label>
       <div className="config-input-group">
         <input
           type="number"
-          value={value}
+          value={inputValue}
           min={min}
           max={max}
           step={step}
-          onChange={(e) => onChange(parseFloat(e.target.value))}
+          onChange={handleInputChange}
           disabled={disabled}
           className="config-input"
         />

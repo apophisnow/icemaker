@@ -156,6 +156,14 @@ async def _shutdown_tasks() -> None:
     # Signal all tasks to stop
     app_state._shutdown_event.set()
 
+    # Check if a graceful restart is pending (state file exists)
+    graceful_restart = False
+    if app_state.controller is not None:
+        state_path = app_state.controller._get_state_path()
+        graceful_restart = state_path.exists()
+        if graceful_restart:
+            logger.info("Graceful restart: preserving relay states")
+
     # Stop the FSM
     if app_state.controller is not None:
         app_state.controller.fsm._running = False
@@ -183,11 +191,17 @@ async def _shutdown_tasks() -> None:
     # Clean up hardware
     if app_state.controller is not None and app_state.controller.gpio is not None:
         try:
+            if not graceful_restart:
+                # Full shutdown - turn off all relays
+                from ..hal.base import RelayName
+                for relay in RelayName:
+                    await app_state.controller.gpio.set_relay(relay, False)
+                logger.info("All relays turned off")
             await app_state.controller.gpio.cleanup()
         except Exception as e:
             logger.error("GPIO cleanup error: %s", e)
 
-    logger.info("Icemaker API shutdown complete")
+    logger.info("Icemaker API shutdown complete (graceful=%s)", graceful_restart)
 
 
 def create_app() -> Quart:
@@ -227,6 +241,14 @@ def create_app() -> Quart:
 
         # Initialize hardware (HAL setup)
         await app_state.controller.initialize()
+
+        # Try to restore state from a previous graceful shutdown
+        restored = await app_state.controller._load_and_restore_state()
+        if restored:
+            logger.info(
+                "Resumed from graceful restart: state=%s",
+                app_state.controller.fsm.state.name,
+            )
 
         # Start thermal model if using simulator
         if app_state.controller._thermal_model is not None:

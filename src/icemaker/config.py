@@ -97,6 +97,9 @@ class IcemakerConfig:
     # Startup options
     skip_priming: bool = True  # Skip water priming on startup (default: skip)
 
+    # Data directory for persistent storage (cycle count, etc.)
+    data_dir: str = "data"
+
 
 def load_config(
     config_path: Path | None = None,
