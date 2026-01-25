@@ -48,6 +48,7 @@ export function Dashboard() {
             className="header-btn"
             onClick={() => setSettingsOpen(true)}
             title="Settings"
+            style={{ fontSize: '1.25rem' }}
           >
             ⚙
           </button>
