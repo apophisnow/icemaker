@@ -130,7 +130,11 @@ export function MainPanel({ status, relays, simulatedTimeInState }: MainPanelPro
         <span>Icemaker</span>
         <span className={`state-badge ${status.state.toLowerCase()}`}>
           {status.state}
-          {status.chill_mode && ` (${status.chill_mode})`}
+          {(status.chill_mode || status.shutdown_requested) && ' ('}
+          {status.chill_mode}
+          {status.chill_mode && status.shutdown_requested && ', '}
+          {status.shutdown_requested && 'shutting down'}
+          {(status.chill_mode || status.shutdown_requested) && ')'}
         </span>
       </div>
 

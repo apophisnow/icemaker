@@ -45,6 +45,7 @@ export interface IcemakerStatus {
   target_temp: number | null;
   time_in_state_seconds: number;
   chill_mode: string | null;
+  shutdown_requested: boolean;  // Graceful shutdown in progress
 }
 
 export interface WebSocketMessage {

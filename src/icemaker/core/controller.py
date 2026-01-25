@@ -79,6 +79,7 @@ class IcemakerController:
         self._running = False
         self._sensor_task: Optional[asyncio.Task[None]] = None
         self._event_listeners: list[callable] = []
+        self._shutdown_requested = False  # Graceful shutdown flag
 
     @property
     def fsm(self) -> AsyncFSM:
@@ -94,6 +95,11 @@ class IcemakerController:
     def sensors(self) -> Optional[TemperatureSensorInterface]:
         """Temperature sensor interface."""
         return self._sensors
+
+    @property
+    def shutdown_requested(self) -> bool:
+        """Whether a graceful shutdown has been requested."""
+        return self._shutdown_requested
 
     def add_event_listener(self, listener: callable) -> None:
         """Add listener for FSM events.
@@ -399,16 +405,29 @@ class IcemakerController:
             return await self._fsm.transition_to(IcemakerState.STANDBY)
 
     async def power_off(self) -> bool:
-        """Power off the icemaker to OFF state.
+        """Power off the icemaker.
 
-        Can be called from STANDBY, IDLE, or ERROR states.
+        If in STANDBY, IDLE, or ERROR: transitions directly to OFF.
+        If in an active cycle (CHILL, ICE, HEAT): sets shutdown flag.
+        The cycle will complete through harvest then go to STANDBY,
+        which will auto-transition to OFF after the standby timeout.
 
         Returns:
-            True if powered off, False if not in a valid state.
+            True if shutdown initiated, False if not in a valid state.
         """
-        if self._fsm.state not in {IcemakerState.STANDBY, IcemakerState.IDLE, IcemakerState.ERROR}:
-            return False
-        return await self._fsm.transition_to(IcemakerState.OFF)
+        # Direct shutdown from non-cycle states
+        if self._fsm.state in {IcemakerState.STANDBY, IcemakerState.IDLE, IcemakerState.ERROR}:
+            self._shutdown_requested = False  # Clear flag if set
+            return await self._fsm.transition_to(IcemakerState.OFF)
+
+        # Graceful shutdown from cycle states
+        cycle_states = {IcemakerState.CHILL, IcemakerState.ICE, IcemakerState.HEAT}
+        if self._fsm.state in cycle_states:
+            logger.info("Graceful shutdown requested - will complete cycle then power off")
+            self._shutdown_requested = True
+            return True
+
+        return False
 
     async def start_cycle(self) -> bool:
         """Start an ice-making cycle from STANDBY or IDLE state.
@@ -566,10 +585,31 @@ class IcemakerController:
 
         Unlike IDLE, STANDBY does NOT auto-restart when bin empties.
         User must explicitly call start_cycle() to begin ice making.
+
+        Ice cutter stays ON during standby to ensure any remaining ice is cut.
+        Auto-transitions to OFF after standby_timeout if shutdown was requested.
         """
-        # Ensure all relays are off while in standby
-        await self._all_relays_off()
-        # Wait for explicit start_cycle() call
+        # Turn off all relays except ice cutter
+        await self._set_relay(RelayName.WATER_VALVE, False)
+        await self._set_relay(RelayName.HOT_GAS_SOLENOID, False)
+        await self._set_relay(RelayName.RECIRCULATING_PUMP, False)
+        await self._set_relay(RelayName.COMPRESSOR_1, False)
+        await self._set_relay(RelayName.COMPRESSOR_2, False)
+        await self._set_relay(RelayName.CONDENSER_FAN, False)
+        # Keep ice cutter ON
+        await self._set_relay(RelayName.ICE_CUTTER, True)
+
+        # Check for standby timeout (auto-transition to OFF)
+        elapsed = fsm.time_in_state()
+        if elapsed >= self.config.standby_timeout:
+            logger.info(
+                "Standby timeout (%.1fs), transitioning to OFF",
+                elapsed,
+            )
+            self._shutdown_requested = False  # Clear flag
+            return IcemakerState.OFF
+
+        # Wait for explicit start_cycle() or power_off() call
         return None
 
     async def _handle_idle(
@@ -672,11 +712,17 @@ class IcemakerController:
                 ctx.cycle_start_time = datetime.now()
                 return IcemakerState.ICE
             else:
-                # Rechill complete - check bin and decide next action
+                # Rechill complete - check shutdown flag, bin, and decide next action
                 ctx.chill_mode = None
                 ctx.cycle_count += 1
                 ctx.session_cycle_count += 1
                 self._save_cycle_count()
+
+                # Check for graceful shutdown request
+                if self._shutdown_requested:
+                    logger.info("Graceful shutdown: cycle complete, entering STANDBY")
+                    return IcemakerState.STANDBY
+
                 if self._is_bin_full():
                     logger.info("Bin full (temp %.1f°F < %.1f°F), entering IDLE to wait",
                                 ctx.bin_temp, self.config.bin_full_threshold)
@@ -705,6 +751,12 @@ class IcemakerController:
                 ctx.cycle_count += 1
                 ctx.session_cycle_count += 1
                 self._save_cycle_count()
+
+                # Check for graceful shutdown request
+                if self._shutdown_requested:
+                    logger.info("Graceful shutdown: cycle complete (timeout), entering STANDBY")
+                    return IcemakerState.STANDBY
+
                 if self._is_bin_full():
                     return IcemakerState.IDLE
                 # Start next cycle - transition to ICE state

@@ -58,10 +58,11 @@ interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   currentState: IcemakerState | undefined;
+  shutdownRequested: boolean;
   onRefresh: () => void;
 }
 
-export function SettingsPanel({ isOpen, onClose, currentState, onRefresh }: SettingsPanelProps) {
+export function SettingsPanel({ isOpen, onClose, currentState, shutdownRequested, onRefresh }: SettingsPanelProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retentionHours, setRetentionHoursState] = useState(getRetentionHours);
@@ -105,7 +106,7 @@ export function SettingsPanel({ isOpen, onClose, currentState, onRefresh }: Sett
   const isDiagnostic = currentState === 'DIAGNOSTIC';
 
   const canPowerOn = isOff;
-  const canPowerOff = isStandby || isIdle || isError;
+  const canPowerOff = (isStandby || isIdle || isError || isInCycle) && !shutdownRequested;
   const canStart = isStandby || isIdle;
   const canStop = isInCycle || isIdle;
   const canEnterDiagnostic = isOff;

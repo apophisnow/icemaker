@@ -84,6 +84,7 @@ export function Dashboard() {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         currentState={status?.state}
+        shutdownRequested={status?.shutdown_requested ?? false}
         onRefresh={refresh}
       />
     </div>

@@ -21,6 +21,7 @@ class StateResponse:
     previous_state: Optional[str] = None
     target_temp: Optional[float] = None
     chill_mode: Optional[str] = None
+    shutdown_requested: bool = False  # Graceful shutdown in progress
 
 
 @dataclass

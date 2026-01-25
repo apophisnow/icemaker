@@ -49,6 +49,7 @@ async def get_current_state():
         target_temp=ctx.target_temp,
         time_in_state_seconds=fsm.time_in_state(),
         chill_mode=ctx.chill_mode,
+        shutdown_requested=state.controller.shutdown_requested,
     )
 
     return _serialize_state_response(response)
@@ -102,7 +103,10 @@ async def control_cycle():
     elif command.action == "power_off":
         success = await state.controller.power_off()
         if not success:
-            abort(400, description="Cannot power off - not in STANDBY, IDLE, or ERROR state")
+            abort(400, description="Cannot power off from current state")
+        # Check if graceful shutdown was initiated (cycle in progress)
+        if state.controller.shutdown_requested:
+            return {"success": True, "message": "Graceful shutdown initiated - will complete cycle then power off"}
         return {"success": True, "message": "Powered off"}
 
     elif command.action == "start":

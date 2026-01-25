@@ -94,6 +94,10 @@ class IcemakerConfig:
     # Polling interval for temperature readings (seconds)
     poll_interval: float = 5.0
 
+    # Standby timeout - auto-transition to OFF after this many seconds in STANDBY
+    # Ice cutter stays on during this period to ensure all ice is cut
+    standby_timeout: float = 1200.0  # 20 minutes
+
     # Startup options
     skip_priming: bool = True  # Skip water priming on startup (default: skip)
 
