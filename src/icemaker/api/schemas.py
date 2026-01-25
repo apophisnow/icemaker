@@ -66,6 +66,7 @@ class ConfigResponse:
     ice_timeout: int
     harvest_threshold: float
     harvest_timeout: int
+    harvest_fill_time: int
     rechill_temp: float
     rechill_timeout: int
     bin_full_threshold: float
@@ -88,6 +89,7 @@ class ConfigUpdate:
     ice_timeout: Optional[int] = None
     harvest_threshold: Optional[float] = None
     harvest_timeout: Optional[int] = None
+    harvest_fill_time: Optional[int] = None
     rechill_temp: Optional[float] = None
     rechill_timeout: Optional[int] = None
     bin_full_threshold: Optional[float] = None

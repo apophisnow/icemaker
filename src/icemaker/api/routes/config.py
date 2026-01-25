@@ -38,6 +38,7 @@ async def get_config():
         ice_timeout=config.ice_making.timeout_seconds,
         harvest_threshold=config.harvest.target_temp,
         harvest_timeout=config.harvest.timeout_seconds,
+        harvest_fill_time=config.harvest_fill_time,
         rechill_temp=config.rechill.target_temp,
         rechill_timeout=config.rechill.timeout_seconds,
         bin_full_threshold=config.bin_full_threshold,
@@ -66,6 +67,7 @@ async def update_config():
         ice_timeout=data.get("ice_timeout"),
         harvest_threshold=data.get("harvest_threshold"),
         harvest_timeout=data.get("harvest_timeout"),
+        harvest_fill_time=data.get("harvest_fill_time"),
         rechill_temp=data.get("rechill_temp"),
         rechill_timeout=data.get("rechill_timeout"),
         bin_full_threshold=data.get("bin_full_threshold"),
@@ -91,6 +93,8 @@ async def update_config():
         config.harvest.target_temp = update.harvest_threshold
     if update.harvest_timeout is not None:
         config.harvest.timeout_seconds = update.harvest_timeout
+    if update.harvest_fill_time is not None:
+        config.harvest_fill_time = update.harvest_fill_time
     if update.rechill_temp is not None:
         config.rechill.target_temp = update.rechill_temp
     if update.rechill_timeout is not None:
@@ -118,6 +122,7 @@ async def update_config():
         ice_timeout=config.ice_making.timeout_seconds,
         harvest_threshold=config.harvest.target_temp,
         harvest_timeout=config.harvest.timeout_seconds,
+        harvest_fill_time=config.harvest_fill_time,
         rechill_temp=config.rechill.target_temp,
         rechill_timeout=config.rechill.timeout_seconds,
         bin_full_threshold=config.bin_full_threshold,
@@ -156,6 +161,7 @@ async def reset_config():
     config.ice_making.timeout_seconds = factory_config.ice_making.timeout_seconds
     config.harvest.target_temp = factory_config.harvest.target_temp
     config.harvest.timeout_seconds = factory_config.harvest.timeout_seconds
+    config.harvest_fill_time = factory_config.harvest_fill_time
     config.rechill.target_temp = factory_config.rechill.target_temp
     config.rechill.timeout_seconds = factory_config.rechill.timeout_seconds
     config.bin_full_threshold = factory_config.bin_full_threshold
@@ -172,6 +178,7 @@ async def reset_config():
         ice_timeout=config.ice_making.timeout_seconds,
         harvest_threshold=config.harvest.target_temp,
         harvest_timeout=config.harvest.timeout_seconds,
+        harvest_fill_time=config.harvest_fill_time,
         rechill_temp=config.rechill.target_temp,
         rechill_timeout=config.rechill.timeout_seconds,
         bin_full_threshold=config.bin_full_threshold,

@@ -817,20 +817,27 @@ class IcemakerController:
 
         Per reference implementation:
         - Condenser fan OFF, recirculating pump OFF
-        - Water valve ON (entire duration to refill reservoir)
+        - Water valve ON for harvest_fill_time seconds (to refill reservoir)
         - Hot gas solenoid ON (heats plate to release ice)
         - Ice cutter ON
         - Compressors stay ON (from ice making phase)
         """
         target_temp = self.config.harvest.target_temp
         timeout = self.config.harvest.timeout_seconds
+        fill_time = self.config.harvest_fill_time
         ctx.target_temp = target_temp
 
-        # Set relays FIRST, before checking conditions
-        # (ensures relays are correct even if we transition away this cycle)
-        await self._set_heating_relays()
-
         elapsed = fsm.time_in_state()
+
+        # Set heating relays, but control water valve based on fill time
+        await self._set_relay(RelayName.COMPRESSOR_1, True)
+        await self._set_relay(RelayName.COMPRESSOR_2, True)
+        await self._set_relay(RelayName.CONDENSER_FAN, False)
+        await self._set_relay(RelayName.HOT_GAS_SOLENOID, True)
+        await self._set_relay(RelayName.RECIRCULATING_PUMP, False)
+        await self._set_relay(RelayName.ICE_CUTTER, True)
+        # Water valve only runs for the first fill_time seconds
+        await self._set_relay(RelayName.WATER_VALVE, elapsed < fill_time)
 
         # Check if we've reached target or timed out
         if ctx.plate_temp >= target_temp:

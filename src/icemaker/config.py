@@ -83,6 +83,7 @@ class IcemakerConfig:
     harvest: StateConfig = field(
         default_factory=lambda: StateConfig(target_temp=38.0, timeout_seconds=240)
     )
+    harvest_fill_time: int = 18  # Seconds to run water valve during harvest
     rechill: StateConfig = field(
         default_factory=lambda: StateConfig(target_temp=35.0, timeout_seconds=300)
     )
@@ -202,6 +203,8 @@ def _merge_yaml(config: IcemakerConfig, path: Path) -> IcemakerConfig:
             config.ice_making = StateConfig(**states["ice_making"])
         if "harvest" in states:
             config.harvest = StateConfig(**states["harvest"])
+        if "harvest_fill_time" in states:
+            config.harvest_fill_time = states["harvest_fill_time"]
         if "rechill" in states:
             config.rechill = StateConfig(**states["rechill"])
 
@@ -251,6 +254,7 @@ def _apply_env_overrides(config: IcemakerConfig) -> IcemakerConfig:
         "ICEMAKER_ICE_TIMEOUT": ("ice_making", "timeout_seconds", int),
         "ICEMAKER_HARVEST_TEMP": ("harvest", "target_temp", float),
         "ICEMAKER_HARVEST_TIMEOUT": ("harvest", "timeout_seconds", int),
+        "ICEMAKER_HARVEST_FILL_TIME": ("harvest_fill_time", None, int),
         "ICEMAKER_RECHILL_TEMP": ("rechill", "target_temp", float),
         "ICEMAKER_RECHILL_TIMEOUT": ("rechill", "timeout_seconds", int),
         "ICEMAKER_BIN_THRESHOLD": ("bin_full_threshold", None, float),
@@ -328,6 +332,7 @@ def save_runtime_config(config: IcemakerConfig, data_dir: str | None = None) -> 
                 "target_temp": config.harvest.target_temp,
                 "timeout_seconds": config.harvest.timeout_seconds,
             },
+            "harvest_fill_time": config.harvest_fill_time,
             "rechill": {
                 "target_temp": config.rechill.target_temp,
                 "timeout_seconds": config.rechill.timeout_seconds,
