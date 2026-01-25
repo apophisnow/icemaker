@@ -13,6 +13,35 @@ import yaml
 logger = logging.getLogger(__name__)
 
 
+def _is_raspberry_pi() -> bool:
+    """Detect if running on a Raspberry Pi."""
+    try:
+        with open("/proc/cpuinfo") as f:
+            cpuinfo = f.read()
+            return "Raspberry Pi" in cpuinfo or "BCM" in cpuinfo
+    except (FileNotFoundError, PermissionError):
+        return False
+
+
+def _load_dotenv(env_path: Path) -> None:
+    """Load environment variables from .env file."""
+    if not env_path.exists():
+        return
+
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, _, value = line.partition("=")
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                # Only set if not already in environment
+                if key not in os.environ:
+                    os.environ[key] = value
+
+
 @dataclass
 class StateConfig:
     """Temperature and timeout settings for a single state."""
@@ -53,7 +82,7 @@ class IcemakerConfig:
 
     # API settings
     api_host: str = "0.0.0.0"
-    api_port: int = 8000
+    api_port: int = 80
 
     # Logging
     log_level: str = "INFO"
@@ -84,6 +113,7 @@ def load_config(
     Args:
         config_path: Path to config directory. Defaults to project config/.
         env: Environment name. Defaults to ICEMAKER_ENV or "development".
+            On Raspberry Pi, defaults to "production".
 
     Returns:
         Loaded IcemakerConfig instance.
@@ -98,18 +128,30 @@ def load_config(
         if not config_path.exists():
             config_path = Path.cwd() / "config"
 
+    # Load .env file from project root (config_path/../.env)
+    project_root = config_path.parent
+    _load_dotenv(project_root / ".env")
+
     # Load default config
     default_path = config_path / "default.yaml"
     if default_path.exists():
         config = _merge_yaml(config, default_path)
         logger.debug("Loaded default config from %s", default_path)
 
-    # Load environment-specific config
-    env = env or os.environ.get("ICEMAKER_ENV", "development")
-    env_path = config_path / f"{env}.yaml"
-    if env_path.exists():
-        config = _merge_yaml(config, env_path)
-        logger.debug("Loaded %s config from %s", env, env_path)
+    # Determine environment: explicit > env var > auto-detect Pi > development
+    if env is None:
+        env = os.environ.get("ICEMAKER_ENV")
+    if env is None:
+        if _is_raspberry_pi():
+            env = "production"
+            logger.info("Raspberry Pi detected, using production environment")
+        else:
+            env = "development"
+
+    env_config_path = config_path / f"{env}.yaml"
+    if env_config_path.exists():
+        config = _merge_yaml(config, env_config_path)
+        logger.debug("Loaded %s config from %s", env, env_config_path)
 
     # Override with environment variables
     config = _apply_env_overrides(config)

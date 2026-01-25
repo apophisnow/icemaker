@@ -128,20 +128,20 @@ EOF
     echo ""
     info "Setup complete!"
     echo ""
-    echo "To run the icemaker:"
+    echo "To run the icemaker (port 80 requires sudo):"
     if has_uv; then
-        echo "  uv run python -m icemaker"
+        echo "  sudo uv run python -m icemaker"
     else
         echo "  source .venv/bin/activate"
-        echo "  python -m icemaker"
+        echo "  sudo python -m icemaker"
     fi
     echo ""
     if is_raspberry_pi; then
-        echo "To install as a system service:"
+        echo "To install as a system service (recommended):"
         echo "  ./setup.sh --service"
         echo ""
         echo "To run priming sequence on first startup:"
-        echo "  ICEMAKER_SKIP_PRIMING=false python -m icemaker"
+        echo "  sudo ICEMAKER_SKIP_PRIMING=false uv run python -m icemaker"
     fi
 }
 
@@ -202,6 +202,8 @@ Environment=ICEMAKER_ENV=production
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONDONTWRITEBYTECODE=0
 Environment=PYTHONOPTIMIZE=1
+# Allow binding to port 80 without root
+AmbientCapabilities=CAP_NET_BIND_SERVICE
 # Pi-optimized: disable access log, limit concurrent connections
 ExecStart=$(which uv 2>/dev/null || echo "$SCRIPT_DIR/.venv/bin/python") run python -m icemaker --no-access-log --limit-concurrency 10
 Restart=always

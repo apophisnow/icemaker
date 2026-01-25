@@ -253,6 +253,25 @@ def create_app() -> Quart:
         """Application shutdown."""
         await _shutdown_tasks()
 
+    @app.route("/")
+    async def index():
+        """Root endpoint - basic status info."""
+        controller = app_state.controller
+        if controller is None:
+            return {"status": "initializing"}
+
+        fsm = controller.fsm
+        ctx = fsm.context
+        return {
+            "name": "Icemaker Control System",
+            "state": fsm.state.name,
+            "plate_temp_f": ctx.plate_temp,
+            "bin_temp_f": ctx.bin_temp,
+            "cycle_count": ctx.cycle_count,
+            "api": "/api",
+            "health": "/health",
+        }
+
     @app.route("/health")
     async def health_check():
         """Health check endpoint."""
