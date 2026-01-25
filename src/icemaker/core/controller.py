@@ -250,7 +250,7 @@ class IcemakerController:
                 for relay_name, on in state_data["relays"].items():
                     try:
                         relay = RelayName(relay_name)
-                        await self._gpio.set_relay(relay, on)
+                        await self._set_relay(relay, on)
                         logger.debug("Restored relay %s = %s", relay_name, on)
                     except ValueError:
                         logger.warning("Unknown relay in saved state: %s", relay_name)
@@ -509,9 +509,9 @@ class IcemakerController:
             await listener(relay_changed_event(relay.value, on))
 
     async def _all_relays_off(self) -> None:
-        """Turn off all relays."""
+        """Turn off all relays and emit events."""
         for relay in RelayName:
-            await self._gpio.set_relay(relay, False)
+            await self._set_relay(relay, False)
 
     async def _set_cooling_relays(self, with_recirculation: bool = False) -> None:
         """Set relays for cooling mode."""
@@ -571,6 +571,8 @@ class IcemakerController:
         ctx: FSMContext,
     ) -> Optional[IcemakerState]:
         """Handle OFF state - system powered off."""
+        # Clear shutdown flag since we've reached OFF
+        self._shutdown_requested = False
         # Ensure all relays are off
         await self._all_relays_off()
         # Wait for explicit power_on() call
