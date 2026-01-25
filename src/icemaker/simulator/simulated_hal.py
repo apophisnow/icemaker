@@ -1,5 +1,7 @@
 """Simulated HAL connected to physics simulator."""
 
+from __future__ import annotations
+
 from ..hal.base import GPIOInterface, TemperatureSensorInterface
 from ..hal.mock_gpio import MockGPIO
 from ..hal.mock_sensors import MockSensors

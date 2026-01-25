@@ -1,5 +1,7 @@
 """Main controller orchestrating FSM, HAL, and state handlers."""
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from datetime import datetime
@@ -31,7 +33,7 @@ class IcemakerController:
 
     The controller implements the ice-making cycle:
     0. OFF: System powered off
-    1. POWER_ON: Prime water system (runs on power_on())
+    1. POWER_ON: Prime water system (optional, skipped by default)
     2. STANDBY: Waiting for manual start_cycle() call
     3. CHILL (prechill): Cool plate to 32°F
     4. ICE: Make ice at -2°F with recirculation
@@ -44,6 +46,8 @@ class IcemakerController:
     STANDBY vs IDLE:
     - STANDBY: Manual control - waits for explicit start_cycle()
     - IDLE: Active ice-making paused - auto-restarts when bin empties
+
+    Priming can be enabled via power_on(prime=True) or config.skip_priming=False.
     """
 
     def __init__(
@@ -179,17 +183,30 @@ class IcemakerController:
 
         logger.info("Controller stopped")
 
-    async def power_on(self) -> bool:
+    async def power_on(self, prime: bool | None = None) -> bool:
         """Power on the icemaker from OFF state.
 
-        Runs the POWER_ON sequence (water priming) then transitions to IDLE.
+        Args:
+            prime: Whether to run the water priming sequence.
+                   If None (default), uses config.skip_priming setting.
+                   If True, always runs priming sequence.
+                   If False, skips priming and goes directly to STANDBY.
 
         Returns:
             True if power on started, False if not in OFF state.
         """
         if self._fsm.state != IcemakerState.OFF:
             return False
-        return await self._fsm.transition_to(IcemakerState.POWER_ON)
+
+        # Determine whether to prime based on parameter or config
+        should_prime = prime if prime is not None else not self.config.skip_priming
+
+        if should_prime:
+            logger.info("Power on with water priming sequence")
+            return await self._fsm.transition_to(IcemakerState.POWER_ON)
+        else:
+            logger.info("Power on skipping priming sequence")
+            return await self._fsm.transition_to(IcemakerState.STANDBY)
 
     async def power_off(self) -> bool:
         """Power off the icemaker to OFF state.

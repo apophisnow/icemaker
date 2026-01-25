@@ -7,6 +7,8 @@ The simulation uses fixed-size ticks for deterministic behavior regardless of
 speed multiplier. Each tick advances simulated time by TICK_SIZE_SECONDS.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 from dataclasses import dataclass, field

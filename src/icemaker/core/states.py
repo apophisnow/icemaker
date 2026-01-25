@@ -1,5 +1,7 @@
 """State definitions and transition rules for icemaker FSM."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
@@ -10,12 +12,14 @@ class IcemakerState(Enum):
 
     States follow the ice-making cycle:
     OFF -> POWER_ON -> STANDBY -> CHILL (prechill) -> ICE -> HEAT -> CHILL (rechill) -> ...
+    Or if priming is skipped:
+    OFF -> STANDBY -> CHILL (prechill) -> ICE -> HEAT -> CHILL (rechill) -> ...
 
     The cycle repeats until the bin is full, then goes to IDLE.
     IDLE auto-restarts when bin empties. STANDBY waits for manual start.
 
     OFF: System powered off, initial state on startup.
-    POWER_ON: Water priming sequence after power on.
+    POWER_ON: Water priming sequence after power on (optional, skipped by default).
     STANDBY: Powered on, waiting for user to manually start ice making.
     IDLE: Active ice-making mode paused due to full bin, auto-restarts when bin empties.
     """
@@ -64,6 +68,7 @@ TRANSITIONS: dict[IcemakerState, StateConfig] = {
         timeout_seconds=float("inf"),
         allowed_transitions=frozenset({
             IcemakerState.POWER_ON,
+            IcemakerState.STANDBY,  # Direct power on when skipping priming
             IcemakerState.SHUTDOWN,
         }),
     ),

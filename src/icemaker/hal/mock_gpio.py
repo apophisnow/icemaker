@@ -1,5 +1,7 @@
 """Mock GPIO implementation for testing and non-Pi development."""
 
+from __future__ import annotations
+
 import logging
 from typing import Optional
 

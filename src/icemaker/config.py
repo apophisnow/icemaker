@@ -1,5 +1,7 @@
 """Configuration management for icemaker control system."""
 
+from __future__ import annotations
+
 import logging
 import os
 from dataclasses import dataclass, field
@@ -62,6 +64,9 @@ class IcemakerConfig:
 
     # Polling interval for temperature readings (seconds)
     poll_interval: float = 5.0
+
+    # Startup options
+    skip_priming: bool = True  # Skip water priming on startup (default: skip)
 
 
 def load_config(
@@ -156,6 +161,10 @@ def _merge_yaml(config: IcemakerConfig, path: Path) -> IcemakerConfig:
     config.log_level = data.get("log_level", config.log_level)
     config.poll_interval = data.get("poll_interval", config.poll_interval)
 
+    if "startup" in data:
+        startup = data["startup"]
+        config.skip_priming = startup.get("skip_priming", config.skip_priming)
+
     return config
 
 
@@ -177,6 +186,7 @@ def _apply_env_overrides(config: IcemakerConfig) -> IcemakerConfig:
         "ICEMAKER_API_PORT": ("api_port", None, int),
         "ICEMAKER_LOG_LEVEL": ("log_level", None, str),
         "ICEMAKER_POLL_INTERVAL": ("poll_interval", None, float),
+        "ICEMAKER_SKIP_PRIMING": ("skip_priming", None, _parse_bool),
     }
 
     for env_var, (attr, sub_attr, converter) in env_map.items():
