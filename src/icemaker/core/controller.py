@@ -227,6 +227,19 @@ class IcemakerController:
 
         # Auto-resume ice making if flag was set (power loss recovery)
         if self._get_ice_making_flag():
+            # Read sensors once to get current temperatures before deciding
+            try:
+                temps = await self._sensors.read_all_temperatures()
+                self._fsm.context.plate_temp = temps.get(SensorName.PLATE, 70.0)
+                self._fsm.context.bin_temp = temps.get(SensorName.ICE_BIN, 70.0)
+                logger.info(
+                    "Power loss recovery: plate=%.1f°F, bin=%.1f°F",
+                    self._fsm.context.plate_temp,
+                    self._fsm.context.bin_temp,
+                )
+            except Exception as e:
+                logger.warning("Failed to read sensors at startup: %s", e)
+
             logger.info("Power loss recovery: resuming ice making")
             await self.start_icemaking()
 
@@ -575,6 +588,17 @@ class IcemakerController:
         ctx: FSMContext,
     ) -> Optional[IcemakerState]:
         """Handle CHILL state - cool plate to target temperature."""
+        # Check bin_full at start of prechill (e.g., after power loss recovery)
+        # This prevents starting a cycle when the bin is already full
+        if ctx.chill_mode == "prechill" and self._is_bin_full():
+            logger.info(
+                "Bin full at cycle start (temp %.1f°F < %.1f°F), entering IDLE",
+                ctx.bin_temp,
+                self.config.bin_full_threshold,
+            )
+            ctx.chill_mode = None
+            return IcemakerState.IDLE
+
         # Determine chill mode and parameters
         if ctx.chill_mode == "rechill":
             target_temp = self.config.rechill.target_temp
