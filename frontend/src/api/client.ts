@@ -2,7 +2,7 @@
  * REST API client for icemaker backend.
  */
 
-import type { IcemakerConfig, IcemakerStatus, RelayStates, TemperatureReading } from '../types/icemaker';
+import type { ConfigSchemaResponse, IcemakerConfig, IcemakerStatus, RelayStates, TemperatureReading } from '../types/icemaker';
 
 const API_BASE = '/api';
 
@@ -38,6 +38,10 @@ export async function fetchTemperatures(): Promise<TemperatureReading> {
 
 export async function fetchConfig(): Promise<IcemakerConfig> {
   return fetchJson<IcemakerConfig>(`${API_BASE}/config/`);
+}
+
+export async function fetchConfigSchema(): Promise<ConfigSchemaResponse> {
+  return fetchJson<ConfigSchemaResponse>(`${API_BASE}/config/schema`);
 }
 
 export async function startIcemaking(): Promise<{ success: boolean; message: string }> {

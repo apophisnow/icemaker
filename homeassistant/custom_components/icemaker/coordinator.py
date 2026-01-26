@@ -27,11 +27,17 @@ class IcemakerConfig:
     ice_timeout: int
     harvest_threshold: float
     harvest_timeout: int
+    harvest_fill_time: int
     rechill_temp: float
     rechill_timeout: int
     bin_full_threshold: float
+    standby_timeout: float
     poll_interval: float
     use_simulator: bool
+    priming_enabled: bool
+    priming_flush_time: int
+    priming_pump_time: int
+    priming_fill_time: int
 
 
 @dataclass
@@ -44,6 +50,7 @@ class IcemakerData:
     bin_temp: float
     target_temp: float | None
     cycle_count: int
+    session_cycle_count: int
     time_in_state_seconds: float
     chill_mode: str | None
     relays: dict[str, bool]
@@ -181,11 +188,17 @@ class IcemakerCoordinator(DataUpdateCoordinator[IcemakerData]):
                     ice_timeout=config_data.get("ice_timeout", 1500),
                     harvest_threshold=config_data.get("harvest_threshold", 38.0),
                     harvest_timeout=config_data.get("harvest_timeout", 240),
+                    harvest_fill_time=config_data.get("harvest_fill_time", 18),
                     rechill_temp=config_data.get("rechill_temp", 35.0),
                     rechill_timeout=config_data.get("rechill_timeout", 300),
                     bin_full_threshold=config_data.get("bin_full_threshold", 35.0),
+                    standby_timeout=config_data.get("standby_timeout", 1200.0),
                     poll_interval=config_data.get("poll_interval", 5.0),
                     use_simulator=config_data.get("use_simulator", False),
+                    priming_enabled=config_data.get("priming_enabled", False),
+                    priming_flush_time=config_data.get("priming_flush_time", 60),
+                    priming_pump_time=config_data.get("priming_pump_time", 15),
+                    priming_fill_time=config_data.get("priming_fill_time", 15),
                 )
 
                 return IcemakerData(
@@ -195,6 +208,7 @@ class IcemakerCoordinator(DataUpdateCoordinator[IcemakerData]):
                     bin_temp=state_data.get("bin_temp", 0.0),
                     target_temp=state_data.get("target_temp"),
                     cycle_count=state_data.get("cycle_count", 0),
+                    session_cycle_count=state_data.get("session_cycle_count", 0),
                     time_in_state_seconds=state_data.get("time_in_state_seconds", 0.0),
                     chill_mode=state_data.get("chill_mode"),
                     relays=relay_data,

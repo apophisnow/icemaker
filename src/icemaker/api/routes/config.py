@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from quart import Blueprint, abort, request
 
 from ...config import load_config, reset_to_factory_defaults, save_runtime_config
-from ..schemas import ConfigResponse, ConfigUpdate
+from ..schemas import CONFIG_SCHEMA, ConfigResponse, ConfigUpdate
 
 if TYPE_CHECKING:
     from ..app import AppState
@@ -20,6 +20,19 @@ def get_app_state() -> "AppState":
     """Get app state - injected at runtime."""
     from ..app import app_state
     return app_state
+
+
+@bp.route("/schema")
+async def get_config_schema():
+    """Get configuration schema with field metadata.
+
+    Returns the single source of truth for all configuration options,
+    including their types, constraints, and descriptions.
+    """
+    return {
+        "fields": [asdict(field) for field in CONFIG_SCHEMA],
+        "categories": ["priming", "chill", "ice", "harvest", "rechill", "idle", "standby", "system"],
+    }
 
 
 @bp.route("/")

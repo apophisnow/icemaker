@@ -1,10 +1,12 @@
 /**
  * Configuration panel for icemaker settings.
+ * Dynamically renders fields based on schema from backend.
  */
 
 import { useEffect, useState } from 'react';
 import {
   fetchConfig,
+  fetchConfigSchema,
   fetchSimulatorStatus,
   resetConfig,
   resetSimulator,
@@ -13,27 +15,29 @@ import {
 } from '../api/client';
 import type { SimulatorStatus } from '../api/client';
 import { useTemperature } from '../contexts/TemperatureContext';
-import type { IcemakerConfig } from '../types/icemaker';
+import type { ConfigFieldSchema, ConfigSchemaResponse, IcemakerConfig } from '../types/icemaker';
 
 interface ConfigFieldProps {
-  label: string;
+  field: ConfigFieldSchema;
   value: number;
-  unit: string;
-  min: number;
-  max: number;
-  step: number;
   onChange: (value: number) => void;
   disabled?: boolean;
+  tempUnit?: string;
+  convertTemp?: (f: number) => number;
 }
 
-function ConfigField({ label, value, unit, min, max, step, onChange, disabled }: ConfigFieldProps) {
+function ConfigField({ field, value, onChange, disabled, tempUnit, convertTemp }: ConfigFieldProps) {
+  const isTemp = field.unit === '°F';
+  const displayValue = isTemp && convertTemp ? convertTemp(value) : value;
+  const displayUnit = isTemp && tempUnit ? tempUnit : field.unit || '';
+
   // Use local state to allow intermediate input states like "-" or "-0"
-  const [inputValue, setInputValue] = useState(value.toString());
+  const [inputValue, setInputValue] = useState(displayValue.toString());
 
   // Sync with external value changes
   useEffect(() => {
-    setInputValue(value.toString());
-  }, [value]);
+    setInputValue((Math.round(displayValue * 10) / 10).toString());
+  }, [displayValue]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value;
@@ -42,31 +46,78 @@ function ConfigField({ label, value, unit, min, max, step, onChange, disabled }:
     // Only propagate valid numbers
     const parsed = parseFloat(raw);
     if (!isNaN(parsed)) {
-      onChange(parsed);
+      // Convert back to Fahrenheit if it's a temperature field
+      if (isTemp && tempUnit === '°C') {
+        onChange((parsed * 9) / 5 + 32);
+      } else {
+        onChange(parsed);
+      }
     }
   };
 
+  // Adjust min/max for Celsius if temperature field
+  let min = field.min_value ?? 0;
+  let max = field.max_value ?? 100;
+  if (isTemp && tempUnit === '°C') {
+    min = Math.round(((min - 32) * 5) / 9);
+    max = Math.round(((max - 32) * 5) / 9);
+  }
+
   return (
     <div className="config-field">
-      <label className="config-label">{label}</label>
+      <label className="config-label" title={field.description}>{field.name}</label>
       <div className="config-input-group">
         <input
           type="number"
           value={inputValue}
           min={min}
           max={max}
-          step={step}
+          step={field.step ?? 1}
           onChange={handleInputChange}
-          disabled={disabled}
+          disabled={disabled || field.readonly}
           className="config-input"
         />
-        <span className="config-unit">{unit}</span>
+        <span className="config-unit">{displayUnit}</span>
       </div>
     </div>
   );
 }
 
+interface BooleanFieldProps {
+  field: ConfigFieldSchema;
+  value: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+}
+
+function BooleanField({ field, value, onChange, disabled }: BooleanFieldProps) {
+  return (
+    <div className="config-toggle-field">
+      <label className="config-label" title={field.description}>{field.name}</label>
+      <button
+        className={`toggle-btn ${value ? 'active' : ''}`}
+        onClick={() => onChange(!value)}
+        disabled={disabled || field.readonly}
+      >
+        {value ? 'Enabled' : 'Disabled'}
+      </button>
+    </div>
+  );
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  chill: 'Prechill (CHILL)',
+  ice: 'Ice Making (ICE)',
+  harvest: 'Harvest (HEAT)',
+  rechill: 'Rechill (CHILL)',
+  idle: 'Bin Full (IDLE)',
+  standby: 'Standby (STANDBY)',
+  priming: 'Priming (POWER_ON)',
+  system: 'System',
+};
+
 export function Configuration() {
+  const [schema, setSchema] = useState<ConfigSchemaResponse | null>(null);
   const [config, setConfig] = useState<IcemakerConfig | null>(null);
   const [simStatus, setSimStatus] = useState<SimulatorStatus | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Partial<IcemakerConfig>>({});
@@ -85,10 +136,12 @@ export function Configuration() {
     try {
       setIsLoading(true);
       setError(null);
-      const [configData, simData] = await Promise.all([
+      const [schemaData, configData, simData] = await Promise.all([
+        fetchConfigSchema(),
         fetchConfig(),
         fetchSimulatorStatus().catch(() => null),
       ]);
+      setSchema(schemaData);
       setConfig(configData);
       setSimStatus(simData);
       setPendingChanges({});
@@ -99,7 +152,7 @@ export function Configuration() {
     }
   };
 
-  const handleChange = (key: keyof IcemakerConfig, value: number | boolean) => {
+  const handleChange = (key: string, value: number | boolean) => {
     setPendingChanges((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -162,23 +215,11 @@ export function Configuration() {
     }
   };
 
-  const getValue = (key: keyof IcemakerConfig): number => {
+  const getValue = (key: string): number | boolean => {
     if (key in pendingChanges) {
-      return pendingChanges[key] as number;
+      return pendingChanges[key as keyof IcemakerConfig] as number | boolean;
     }
-    return config?.[key] as number ?? 0;
-  };
-
-  // Convert temperature for display (config is stored in F)
-  const getTempValue = (key: keyof IcemakerConfig): number => {
-    const rawValue = getValue(key);
-    return unit === 'C' ? convertTemp(rawValue) : rawValue;
-  };
-
-  // Convert temperature back to F for storage
-  const handleTempChange = (key: keyof IcemakerConfig, displayValue: number) => {
-    const storedValue = unit === 'C' ? (displayValue * 9) / 5 + 32 : displayValue;
-    handleChange(key, storedValue);
+    return config?.[key as keyof IcemakerConfig] as number | boolean ?? 0;
   };
 
   const hasChanges = Object.keys(pendingChanges).length > 0;
@@ -192,6 +233,15 @@ export function Configuration() {
       </div>
     );
   }
+
+  // Group fields by category
+  const fieldsByCategory: Record<string, ConfigFieldSchema[]> = {};
+  schema?.fields.forEach((field) => {
+    if (!fieldsByCategory[field.category]) {
+      fieldsByCategory[field.category] = [];
+    }
+    fieldsByCategory[field.category].push(field);
+  });
 
   return (
     <div className="configuration">
@@ -237,193 +287,60 @@ export function Configuration() {
             </div>
           )}
 
-          <div className="config-section">
-            <h4>Temperature Thresholds</h4>
-            <div className="config-grid">
-              <ConfigField
-                label="Prechill Temp"
-                value={Math.round(getTempValue('prechill_temp') * 10) / 10}
-                unit={tempUnit}
-                min={unit === 'C' ? -7 : 20}
-                max={unit === 'C' ? 10 : 50}
-                step={0.5}
-                onChange={(v) => handleTempChange('prechill_temp', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Ice Target Temp"
-                value={Math.round(getTempValue('ice_target_temp') * 10) / 10}
-                unit={tempUnit}
-                min={unit === 'C' ? -29 : -20}
-                max={unit === 'C' ? -7 : 20}
-                step={0.5}
-                onChange={(v) => handleTempChange('ice_target_temp', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Harvest Threshold"
-                value={Math.round(getTempValue('harvest_threshold') * 10) / 10}
-                unit={tempUnit}
-                min={unit === 'C' ? -1 : 30}
-                max={unit === 'C' ? 16 : 60}
-                step={0.5}
-                onChange={(v) => handleTempChange('harvest_threshold', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Rechill Temp"
-                value={Math.round(getTempValue('rechill_temp') * 10) / 10}
-                unit={tempUnit}
-                min={unit === 'C' ? -4 : 25}
-                max={unit === 'C' ? 10 : 50}
-                step={0.5}
-                onChange={(v) => handleTempChange('rechill_temp', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Bin Full Threshold"
-                value={Math.round(getTempValue('bin_full_threshold') * 10) / 10}
-                unit={tempUnit}
-                min={unit === 'C' ? -7 : 20}
-                max={unit === 'C' ? 10 : 50}
-                step={0.5}
-                onChange={(v) => handleTempChange('bin_full_threshold', v)}
-                disabled={isSaving}
-              />
-            </div>
-          </div>
+          {schema?.categories.map((category) => {
+            const fields = fieldsByCategory[category];
+            if (!fields || fields.length === 0) return null;
 
-          <div className="config-section">
-            <h4>Timeouts</h4>
-            <div className="config-grid">
-              <ConfigField
-                label="Prechill Timeout"
-                value={getValue('prechill_timeout')}
-                unit="sec"
-                min={30}
-                max={600}
-                step={10}
-                onChange={(v) => handleChange('prechill_timeout', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Ice Timeout"
-                value={getValue('ice_timeout')}
-                unit="sec"
-                min={300}
-                max={3600}
-                step={60}
-                onChange={(v) => handleChange('ice_timeout', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Harvest Timeout"
-                value={getValue('harvest_timeout')}
-                unit="sec"
-                min={60}
-                max={600}
-                step={10}
-                onChange={(v) => handleChange('harvest_timeout', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Rechill Timeout"
-                value={getValue('rechill_timeout')}
-                unit="sec"
-                min={60}
-                max={600}
-                step={10}
-                onChange={(v) => handleChange('rechill_timeout', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Standby Timeout"
-                value={getValue('standby_timeout')}
-                unit="sec"
-                min={60}
-                max={3600}
-                step={60}
-                onChange={(v) => handleChange('standby_timeout', v)}
-                disabled={isSaving}
-              />
-            </div>
-          </div>
+            // Separate boolean and numeric fields
+            const boolFields = fields.filter((f) => f.type === 'bool');
+            const numericFields = fields.filter((f) => f.type !== 'bool');
 
-          <div className="config-section">
-            <h4>Priming</h4>
-            <div className="config-toggle-field">
-              <label className="config-label">Priming on Power On</label>
-              <button
-                className={`toggle-btn ${(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'active' : ''}`}
-                onClick={() => handleChange('priming_enabled', !(pendingChanges.priming_enabled ?? config?.priming_enabled))}
-                disabled={isSaving}
-              >
-                {(pendingChanges.priming_enabled ?? config?.priming_enabled) ? 'Enabled' : 'Disabled'}
-              </button>
-            </div>
-            <div className="config-grid">
-              <ConfigField
-                label="Flush Time"
-                value={getValue('priming_flush_time')}
-                unit="sec"
-                min={5}
-                max={300}
-                step={5}
-                onChange={(v) => handleChange('priming_flush_time', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Pump Time"
-                value={getValue('priming_pump_time')}
-                unit="sec"
-                min={5}
-                max={120}
-                step={5}
-                onChange={(v) => handleChange('priming_pump_time', v)}
-                disabled={isSaving}
-              />
-              <ConfigField
-                label="Fill Time"
-                value={getValue('priming_fill_time')}
-                unit="sec"
-                min={5}
-                max={120}
-                step={5}
-                onChange={(v) => handleChange('priming_fill_time', v)}
-                disabled={isSaving}
-              />
-            </div>
-          </div>
+            return (
+              <div key={category} className="config-section">
+                <h4>{CATEGORY_LABELS[category] || category}</h4>
 
-          <div className="config-section">
-            <h4>System</h4>
-            <div className="config-grid">
-              <ConfigField
-                label="Poll Interval"
-                value={getValue('poll_interval')}
-                unit="sec"
-                min={1}
-                max={30}
-                step={0.5}
-                onChange={(v) => handleChange('poll_interval', v)}
-                disabled={isSaving}
-              />
-            </div>
-            <div className="config-info">
-              <span className="config-simulator-label">Simulator Mode:</span>
-              <span className={`config-simulator-value ${config?.use_simulator ? 'enabled' : 'disabled'}`}>
-                {config?.use_simulator ? 'Enabled' : 'Disabled'}
-              </span>
-            </div>
-            <button
-              className="btn btn-warning btn-block btn-sm"
-              onClick={handleFactoryReset}
-              disabled={isResetting || isSaving}
-              style={{ marginTop: '0.75rem' }}
-            >
-              {isResetting ? 'Resetting...' : 'Reset to Factory Defaults'}
-            </button>
-          </div>
+                {/* Render boolean fields first as toggles */}
+                {boolFields.map((field) => (
+                  <BooleanField
+                    key={field.key}
+                    field={field}
+                    value={getValue(field.key) as boolean}
+                    onChange={(v) => handleChange(field.key, v)}
+                    disabled={isSaving}
+                  />
+                ))}
+
+                {/* Render numeric fields in grid */}
+                {numericFields.length > 0 && (
+                  <div className="config-grid">
+                    {numericFields.map((field) => (
+                      <ConfigField
+                        key={field.key}
+                        field={field}
+                        value={getValue(field.key) as number}
+                        onChange={(v) => handleChange(field.key, v)}
+                        disabled={isSaving}
+                        tempUnit={field.unit === '°F' ? tempUnit : undefined}
+                        convertTemp={field.unit === '°F' ? convertTemp : undefined}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Factory reset button in system section */}
+                {category === 'system' && (
+                  <button
+                    className="btn btn-warning btn-block btn-sm"
+                    onClick={handleFactoryReset}
+                    disabled={isResetting || isSaving}
+                    style={{ marginTop: '0.75rem' }}
+                  >
+                    {isResetting ? 'Resetting...' : 'Reset to Factory Defaults'}
+                  </button>
+                )}
+              </div>
+            );
+          })}
 
           {hasChanges && (
             <div className="config-actions">

@@ -21,6 +21,8 @@ states:
     target_temp: 35.0       # target_temp=35 in post-harvest chill_plate call
     timeout_seconds: 300    # timeout=5*MIN (5 minutes)
 
+harvest_fill_time: 18        # seconds of water fill during harvest
+
 thresholds:
   bin_full: 35.0            # threshold=35 in bin_full function
 
@@ -30,6 +32,8 @@ hardware:
 
 startup:
   priming_enabled: false    # Priming disabled by default (system already primed)
+
+standby_timeout: 1200.0     # 20 minutes before auto-transitioning from STANDBY to OFF
 
 simulation:
   enabled: false

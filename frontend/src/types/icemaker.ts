@@ -61,6 +61,7 @@ export interface IcemakerConfig {
   ice_timeout: number;
   harvest_threshold: number;
   harvest_timeout: number;
+  harvest_fill_time: number;
   rechill_temp: number;
   rechill_timeout: number;
   bin_full_threshold: number;
@@ -71,6 +72,25 @@ export interface IcemakerConfig {
   priming_flush_time: number;
   priming_pump_time: number;
   priming_fill_time: number;
+}
+
+export interface ConfigFieldSchema {
+  key: string;
+  name: string;
+  description: string;
+  type: 'float' | 'int' | 'bool';
+  category: 'chill' | 'ice' | 'harvest' | 'rechill' | 'idle' | 'standby' | 'priming' | 'system';
+  unit?: string;
+  min_value?: number;
+  max_value?: number;
+  step?: number;
+  default?: number | boolean;
+  readonly: boolean;
+}
+
+export interface ConfigSchemaResponse {
+  fields: ConfigFieldSchema[];
+  categories: string[];
 }
 
 export interface StateUpdateData {

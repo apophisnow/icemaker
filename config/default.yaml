@@ -21,6 +21,15 @@ states:
     target_temp: 35.0
     timeout_seconds: 300  # 5 minutes
 
+harvest_fill_time: 18  # seconds of water fill during harvest
+standby_timeout: 1200.0  # 20 minutes before auto-transitioning from STANDBY to OFF
+
+startup:
+  priming_enabled: false
+  priming_flush_time: 60
+  priming_pump_time: 15
+  priming_fill_time: 15
+
 thresholds:
   bin_full: 35.0
 

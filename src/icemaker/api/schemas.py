@@ -122,3 +122,229 @@ class ErrorResponse:
 
     error: str
     detail: Optional[str] = None
+
+
+@dataclass
+class ConfigFieldSchema:
+    """Schema for a single configuration field."""
+
+    key: str
+    name: str
+    description: str
+    type: str  # "float", "int", "bool"
+    category: str  # State-based: "chill", "ice", "harvest", "rechill", "idle", "standby", "priming", "system"
+    unit: Optional[str] = None  # "°F", "seconds", etc.
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+    step: Optional[float] = None
+    default: Any = None
+    readonly: bool = False
+
+
+# Single source of truth for all config field metadata
+# Organized by the state/phase each setting applies to (in execution order)
+CONFIG_SCHEMA: list[ConfigFieldSchema] = [
+    # POWER_ON state (priming) - runs first when enabled
+    ConfigFieldSchema(
+        key="priming_enabled",
+        name="Enable Priming",
+        description="Run water priming sequence on startup",
+        type="bool",
+        category="priming",
+        default=False,
+    ),
+    ConfigFieldSchema(
+        key="priming_flush_time",
+        name="1. Flush Time",
+        description="Duration of initial water flush",
+        type="int",
+        category="priming",
+        unit="seconds",
+        min_value=10,
+        max_value=180,
+        step=5,
+        default=60,
+    ),
+    ConfigFieldSchema(
+        key="priming_pump_time",
+        name="2. Pump Time",
+        description="Duration of pump operation during priming",
+        type="int",
+        category="priming",
+        unit="seconds",
+        min_value=5,
+        max_value=60,
+        step=5,
+        default=15,
+    ),
+    ConfigFieldSchema(
+        key="priming_fill_time",
+        name="3. Fill Time",
+        description="Duration of water fill during priming",
+        type="int",
+        category="priming",
+        unit="seconds",
+        min_value=5,
+        max_value=60,
+        step=5,
+        default=15,
+    ),
+    # CHILL state (prechill phase)
+    ConfigFieldSchema(
+        key="prechill_temp",
+        name="Target Temperature",
+        description="Target plate temperature before ice making begins",
+        type="float",
+        category="chill",
+        unit="°F",
+        min_value=20.0,
+        max_value=50.0,
+        step=0.5,
+        default=32.0,
+    ),
+    ConfigFieldSchema(
+        key="prechill_timeout",
+        name="Timeout",
+        description="Maximum time allowed for prechill phase",
+        type="int",
+        category="chill",
+        unit="seconds",
+        min_value=30,
+        max_value=600,
+        step=10,
+        default=120,
+    ),
+    # ICE state
+    ConfigFieldSchema(
+        key="ice_target_temp",
+        name="Target Temperature",
+        description="Target plate temperature for ice formation",
+        type="float",
+        category="ice",
+        unit="°F",
+        min_value=-20.0,
+        max_value=20.0,
+        step=0.5,
+        default=-2.0,
+    ),
+    ConfigFieldSchema(
+        key="ice_timeout",
+        name="Timeout",
+        description="Maximum time allowed for ice formation",
+        type="int",
+        category="ice",
+        unit="seconds",
+        min_value=300,
+        max_value=3600,
+        step=60,
+        default=1500,
+    ),
+    # HEAT state (harvest)
+    ConfigFieldSchema(
+        key="harvest_threshold",
+        name="Release Temperature",
+        description="Plate temperature at which ice releases",
+        type="float",
+        category="harvest",
+        unit="°F",
+        min_value=30.0,
+        max_value=60.0,
+        step=0.5,
+        default=38.0,
+    ),
+    ConfigFieldSchema(
+        key="harvest_timeout",
+        name="Timeout",
+        description="Maximum time allowed for harvest phase",
+        type="int",
+        category="harvest",
+        unit="seconds",
+        min_value=60,
+        max_value=600,
+        step=10,
+        default=240,
+    ),
+    ConfigFieldSchema(
+        key="harvest_fill_time",
+        name="Water Fill Time",
+        description="Duration of water fill during harvest",
+        type="int",
+        category="harvest",
+        unit="seconds",
+        min_value=5,
+        max_value=60,
+        step=1,
+        default=18,
+    ),
+    # CHILL state (rechill phase)
+    ConfigFieldSchema(
+        key="rechill_temp",
+        name="Target Temperature",
+        description="Target plate temperature after harvest",
+        type="float",
+        category="rechill",
+        unit="°F",
+        min_value=25.0,
+        max_value=50.0,
+        step=0.5,
+        default=35.0,
+    ),
+    ConfigFieldSchema(
+        key="rechill_timeout",
+        name="Timeout",
+        description="Maximum time allowed for rechill phase",
+        type="int",
+        category="rechill",
+        unit="seconds",
+        min_value=60,
+        max_value=600,
+        step=10,
+        default=300,
+    ),
+    # IDLE state (bin full detection)
+    ConfigFieldSchema(
+        key="bin_full_threshold",
+        name="Bin Full Temperature",
+        description="Bin temperature indicating it is full of ice",
+        type="float",
+        category="idle",
+        unit="°F",
+        min_value=20.0,
+        max_value=50.0,
+        step=0.5,
+        default=35.0,
+    ),
+    # STANDBY state
+    ConfigFieldSchema(
+        key="standby_timeout",
+        name="Auto-Off Timeout",
+        description="Time before auto-transitioning from STANDBY to OFF",
+        type="float",
+        category="standby",
+        unit="seconds",
+        min_value=60,
+        max_value=7200,
+        step=60,
+        default=1200.0,
+    ),
+    # System settings (read-only)
+    ConfigFieldSchema(
+        key="poll_interval",
+        name="Poll Interval",
+        description="Interval between sensor readings",
+        type="float",
+        category="system",
+        unit="seconds",
+        default=5.0,
+        readonly=True,
+    ),
+    ConfigFieldSchema(
+        key="use_simulator",
+        name="Simulator Mode",
+        description="Whether running in simulation mode",
+        type="bool",
+        category="system",
+        default=False,
+        readonly=True,
+    ),
+]

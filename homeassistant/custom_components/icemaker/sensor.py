@@ -69,10 +69,18 @@ SENSOR_DESCRIPTIONS: tuple[IcemakerSensorEntityDescription, ...] = (
     IcemakerSensorEntityDescription(
         key="cycle_count",
         translation_key="cycle_count",
-        name="Cycle Count",
+        name="Lifetime Cycle Count",
         icon="mdi:counter",
         state_class=SensorStateClass.TOTAL_INCREASING,
         value_fn=lambda data: data.cycle_count,
+    ),
+    IcemakerSensorEntityDescription(
+        key="session_cycle_count",
+        translation_key="session_cycle_count",
+        name="Session Cycle Count",
+        icon="mdi:counter",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.session_cycle_count,
     ),
     IcemakerSensorEntityDescription(
         key="time_in_state",

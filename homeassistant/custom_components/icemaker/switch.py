@@ -20,7 +20,10 @@ async def async_setup_entry(
     """Set up Icemaker switches based on a config entry."""
     coordinator: IcemakerCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities([IcemakerCycleSwitch(coordinator, entry)])
+    async_add_entities([
+        IcemakerCycleSwitch(coordinator, entry),
+        IcemakerPrimingSwitch(coordinator, entry),
+    ])
 
 
 class IcemakerCycleSwitch(CoordinatorEntity[IcemakerCoordinator], SwitchEntity):
@@ -60,4 +63,44 @@ class IcemakerCycleSwitch(CoordinatorEntity[IcemakerCoordinator], SwitchEntity):
     async def async_turn_off(self, **kwargs) -> None:
         """Stop the ice-making cycle."""
         await self.coordinator.client.stop_icemaking()
+        await self.coordinator.async_request_refresh()
+
+
+class IcemakerPrimingSwitch(CoordinatorEntity[IcemakerCoordinator], SwitchEntity):
+    """Switch to enable/disable priming on startup."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Priming Enabled"
+    _attr_icon = "mdi:water-pump"
+
+    def __init__(
+        self,
+        coordinator: IcemakerCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the switch."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_priming_enabled"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": "Icemaker",
+            "manufacturer": "Custom",
+            "model": "Icemaker Controller",
+        }
+
+    @property
+    def is_on(self) -> bool:
+        """Return true if priming is enabled."""
+        if self.coordinator.data.config is None:
+            return False
+        return self.coordinator.data.config.priming_enabled
+
+    async def async_turn_on(self, **kwargs) -> None:
+        """Enable priming."""
+        await self.coordinator.client.update_config(priming_enabled=True)
+        await self.coordinator.async_request_refresh()
+
+    async def async_turn_off(self, **kwargs) -> None:
+        """Disable priming."""
+        await self.coordinator.client.update_config(priming_enabled=False)
         await self.coordinator.async_request_refresh()
