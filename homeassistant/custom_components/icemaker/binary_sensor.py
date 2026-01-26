@@ -51,10 +51,14 @@ async def async_setup_entry(
     """Set up Icemaker binary sensors based on a config entry."""
     coordinator: IcemakerCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities(
+    entities: list[BinarySensorEntity] = [
         IcemakerRelaySensor(coordinator, description, entry)
         for description in BINARY_SENSOR_DESCRIPTIONS
-    )
+    ]
+    # Add bin full sensor
+    entities.append(IcemakerBinFullSensor(coordinator, entry))
+
+    async_add_entities(entities)
 
 
 class IcemakerRelaySensor(CoordinatorEntity[IcemakerCoordinator], BinarySensorEntity):
@@ -88,3 +92,31 @@ class IcemakerRelaySensor(CoordinatorEntity[IcemakerCoordinator], BinarySensorEn
         """Return true if the relay is on."""
         relays = self.coordinator.data.relays
         return relays.get(self.entity_description.relay_key, False)
+
+
+class IcemakerBinFullSensor(CoordinatorEntity[IcemakerCoordinator], BinarySensorEntity):
+    """Binary sensor indicating if the ice bin is full."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Bin Full"
+    _attr_icon = "mdi:cube-outline"
+
+    def __init__(
+        self,
+        coordinator: IcemakerCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the binary sensor."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{entry.entry_id}_bin_full"
+        self._attr_device_info = {
+            "identifiers": {(DOMAIN, entry.entry_id)},
+            "name": "Icemaker",
+            "manufacturer": "Custom",
+            "model": "Icemaker Controller",
+        }
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if the bin is full."""
+        return self.coordinator.data.bin_full

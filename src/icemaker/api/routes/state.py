@@ -38,6 +38,9 @@ async def get_current_state():
     fsm = state.controller.fsm
     ctx = fsm.context
 
+    # Check if bin is full (bin temp below threshold means ice is present)
+    bin_full = ctx.bin_temp < state.controller.config.bin_full_threshold
+
     response = StateResponse(
         state=fsm.state.name,
         previous_state=fsm.previous_state.name if fsm.previous_state else None,
@@ -50,6 +53,7 @@ async def get_current_state():
         time_in_state_seconds=fsm.time_in_state(),
         chill_mode=ctx.chill_mode,
         shutdown_requested=state.controller.shutdown_requested,
+        bin_full=bin_full,
     )
 
     return _serialize_state_response(response)

@@ -22,6 +22,7 @@ class StateResponse:
     target_temp: Optional[float] = None
     chill_mode: Optional[str] = None
     shutdown_requested: bool = False  # Graceful shutdown in progress
+    bin_full: bool = False  # Whether ice bin is full (bin_temp < bin_full_threshold)
 
 
 @dataclass

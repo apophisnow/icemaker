@@ -54,6 +54,7 @@ class IcemakerData:
     time_in_state_seconds: float
     chill_mode: str | None
     relays: dict[str, bool]
+    bin_full: bool = False
     config: IcemakerConfig | None = None
 
 
@@ -212,6 +213,7 @@ class IcemakerCoordinator(DataUpdateCoordinator[IcemakerData]):
                     time_in_state_seconds=state_data.get("time_in_state_seconds", 0.0),
                     chill_mode=state_data.get("chill_mode"),
                     relays=relay_data,
+                    bin_full=state_data.get("bin_full", False),
                     config=config,
                 )
         except aiohttp.ClientError as err:

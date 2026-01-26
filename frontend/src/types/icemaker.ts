@@ -46,6 +46,7 @@ export interface IcemakerStatus {
   time_in_state_seconds: number;
   chill_mode: string | null;
   shutdown_requested: boolean;  // Graceful shutdown in progress
+  bin_full: boolean;  // Whether ice bin is full
 }
 
 export interface WebSocketMessage {
@@ -103,6 +104,7 @@ export interface StateUpdateData {
   session_cycle_count: number;
   time_in_state_seconds: number;
   chill_mode: string | null;
+  bin_full: boolean;
 }
 
 export interface TempUpdateData {
