@@ -99,7 +99,6 @@ class IcemakerBinFullSensor(CoordinatorEntity[IcemakerCoordinator], BinarySensor
 
     _attr_has_entity_name = True
     _attr_name = "Bin Full"
-    _attr_icon = "mdi:cube-outline"
 
     def __init__(
         self,
@@ -120,3 +119,10 @@ class IcemakerBinFullSensor(CoordinatorEntity[IcemakerCoordinator], BinarySensor
     def is_on(self) -> bool | None:
         """Return true if the bin is full."""
         return self.coordinator.data.bin_full
+
+    @property
+    def icon(self) -> str:
+        """Return icon based on bin state."""
+        if self.coordinator.data.bin_full:
+            return "mdi:cube"  # Filled cube when bin is full
+        return "mdi:cube-outline"  # Outline when bin has room
