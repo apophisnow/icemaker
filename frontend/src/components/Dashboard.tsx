@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useIcemakerState } from '../hooks/useIcemakerState';
 import { useTemperature } from '../contexts/TemperatureContext';
-import { fetchVersion, applyUpdate } from '../api/client';
+import { fetchVersion } from '../api/client';
 import { MainPanel } from './MainPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { TemperatureChart } from './TemperatureChart';
@@ -24,7 +24,6 @@ export function Dashboard() {
   const { unit, toggleUnit } = useTemperature();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [isUpdating, setIsUpdating] = useState(false);
 
   // Check for updates on mount and every 60 seconds
   useEffect(() => {
@@ -42,17 +41,6 @@ export function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleUpdate = async () => {
-    if (isUpdating) return;
-    setIsUpdating(true);
-    try {
-      await applyUpdate();
-      // Service will restart, page will lose connection
-    } catch {
-      setIsUpdating(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="dashboard loading-state">
@@ -67,14 +55,9 @@ export function Dashboard() {
       <header className="dashboard-header">
         <h1>Icemaker</h1>
         {updateAvailable && (
-          <button
-            className="update-notice"
-            onClick={handleUpdate}
-            disabled={isUpdating}
-            title="Click to pull updates and restart server"
-          >
-            {isUpdating ? 'Updating...' : 'Update available'}
-          </button>
+          <span className="update-notice" title="Restart server to apply updates">
+            Update available
+          </span>
         )}
         <div className="header-actions">
           <button

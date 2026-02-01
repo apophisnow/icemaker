@@ -203,17 +203,6 @@ export function MainPanel({ status, relays, simulatedTimeInState }: MainPanelPro
                 <Indicator label="LED" active={relays.LED} relayName="LED" isDiagnostic={isDiagnostic} onToggle={handleRelayToggle} />
               </div>
             </div>
-
-            {/* Visual representation */}
-            <div className="visual-row">
-              <div className={`plate-icon-compact ${plateState}`}>
-                {plateState === 'heating' ? '🔥' : '❄️'}
-              </div>
-              <div className={`flow-arrow ${relays.recirculating_pump ? 'active' : ''}`}>
-                {relays.hot_gas_solenoid ? '↓' : '↑'}
-              </div>
-              <div className="bin-icon-compact">🧊</div>
-            </div>
           </>
         )}
       </div>

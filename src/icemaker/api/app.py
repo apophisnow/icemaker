@@ -369,33 +369,6 @@ def create_app() -> Quart:
             ),
         }
 
-    @app.route("/api/update", methods=["POST"])
-    async def apply_update():
-        """Pull latest code and restart the service."""
-        repo_path = _get_repo_path()
-        try:
-            # Pull latest changes
-            result = subprocess.run(
-                ["git", "pull", "origin", "main"],
-                capture_output=True,
-                text=True,
-                timeout=60,
-                cwd=repo_path,
-            )
-            if result.returncode != 0:
-                return {"success": False, "error": f"Git pull failed: {result.stderr}"}, 500
-
-            # Restart the service (runs in background, won't wait for completion)
-            subprocess.Popen(
-                ["systemctl", "restart", "icemaker"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-
-            return {"success": True, "message": "Update applied, restarting service..."}
-        except Exception as e:
-            return {"success": False, "error": str(e)}, 500
-
     # Register API blueprints
     from .routes import config, relays, sensors, simulator, state
 
