@@ -588,16 +588,18 @@ class IcemakerController:
         ctx: FSMContext,
     ) -> Optional[IcemakerState]:
         """Handle CHILL state - cool plate to target temperature."""
-        # Check bin_full at start of prechill (e.g., after power loss recovery)
-        # This prevents starting a cycle when the bin is already full
-        if ctx.chill_mode == "prechill" and self._is_bin_full():
-            logger.info(
-                "Bin full at cycle start (temp %.1f°F < %.1f°F), entering IDLE",
-                ctx.bin_temp,
-                self.config.bin_full_threshold,
-            )
-            ctx.chill_mode = None
-            return IcemakerState.IDLE
+        # Check bin_full once at start of prechill to prevent starting a cycle
+        # when the bin is already full. Flag is reset at end of each cycle.
+        if ctx.chill_mode == "prechill" and not ctx.prechill_bin_checked:
+            ctx.prechill_bin_checked = True
+            if self._is_bin_full():
+                logger.info(
+                    "Bin full at cycle start (temp %.1f°F < %.1f°F), entering IDLE",
+                    ctx.bin_temp,
+                    self.config.bin_full_threshold,
+                )
+                ctx.chill_mode = None
+                return IcemakerState.IDLE
 
         # Determine chill mode and parameters
         if ctx.chill_mode == "rechill":
@@ -632,6 +634,7 @@ class IcemakerController:
                 ctx.cycle_count += 1
                 ctx.session_cycle_count += 1
                 self._save_cycle_count()
+                ctx.prechill_bin_checked = False  # Reset for next cycle
 
                 # Check for graceful shutdown request
                 if self._shutdown_requested:
@@ -666,6 +669,7 @@ class IcemakerController:
                 ctx.cycle_count += 1
                 ctx.session_cycle_count += 1
                 self._save_cycle_count()
+                ctx.prechill_bin_checked = False  # Reset for next cycle
 
                 # Check for graceful shutdown request
                 if self._shutdown_requested:

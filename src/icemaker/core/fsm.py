@@ -37,6 +37,7 @@ class FSMContext:
         cycle_start_time: When the current cycle started.
         chill_mode: Current chill mode (PRECHILL or RECHILL).
         simulated_state_enter_time: Simulated time when state was entered.
+        prechill_bin_checked: Whether bin-full check was done at start of this cycle.
     """
 
     plate_temp: float = 70.0
@@ -48,6 +49,7 @@ class FSMContext:
     cycle_start_time: Optional[datetime] = None
     chill_mode: Optional[str] = None  # "prechill" or "rechill"
     simulated_state_enter_time: Optional[float] = None  # Simulated seconds at state entry
+    prechill_bin_checked: bool = False  # Whether initial bin check was done this cycle
 
 
 class AsyncFSM:
