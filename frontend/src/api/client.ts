@@ -120,6 +120,22 @@ export async function transitionState(
   });
 }
 
+// Version API
+
+export interface VersionInfo {
+  running_commit: string | null;
+  remote_commit: string | null;
+  update_available: boolean;
+}
+
+export async function fetchVersion(): Promise<VersionInfo> {
+  return fetchJson<VersionInfo>(`${API_BASE}/version`);
+}
+
+export async function applyUpdate(): Promise<{ success: boolean; message?: string; error?: string }> {
+  return fetchJson(`${API_BASE}/update`, { method: 'POST' });
+}
+
 // Simulator API
 
 export interface SimulatorStatus {

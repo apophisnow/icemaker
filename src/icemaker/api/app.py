@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -20,6 +21,54 @@ from .websocket import WebSocketManager
 logger = logging.getLogger(__name__)
 
 
+def _get_repo_path() -> Path:
+    """Get the git repository root path."""
+    return Path(__file__).parent.parent.parent.parent
+
+
+def _get_git_commit() -> Optional[str]:
+    """Get current git commit hash."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=_get_repo_path(),
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def _get_remote_commit() -> Optional[str]:
+    """Fetch from remote and get the latest commit hash."""
+    repo_path = _get_repo_path()
+    try:
+        # Fetch latest from origin
+        subprocess.run(
+            ["git", "fetch", "origin"],
+            capture_output=True,
+            timeout=30,
+            cwd=repo_path,
+        )
+        # Get the remote HEAD commit
+        result = subprocess.run(
+            ["git", "rev-parse", "origin/main"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=repo_path,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
 @dataclass
 class AppState:
     """Application state container."""
@@ -29,6 +78,7 @@ class AppState:
     _controller_task: Optional[asyncio.Task] = None
     _sensor_task: Optional[asyncio.Task] = None
     _shutdown_event: asyncio.Event = field(default_factory=asyncio.Event)
+    startup_commit: Optional[str] = None  # Git commit at server startup
 
 
 # Global app state
@@ -228,8 +278,11 @@ def create_app() -> Quart:
         # Reset shutdown event for fresh start
         app_state._shutdown_event = asyncio.Event()
 
+        # Capture git commit at startup
+        app_state.startup_commit = _get_git_commit()
+
         # Startup
-        logger.info("Starting icemaker API")
+        logger.info("Starting icemaker API (commit: %s)", app_state.startup_commit[:7] if app_state.startup_commit else "unknown")
 
         # Load configuration
         cfg = load_config()
@@ -300,6 +353,48 @@ def create_app() -> Quart:
             "controller_running": app_state.controller is not None,
             "websocket_connections": app_state.ws_manager.connection_count,
         }
+
+    @app.route("/api/version")
+    async def version_check():
+        """Check if server is running latest code from remote."""
+        running_commit = app_state.startup_commit
+        remote_commit = _get_remote_commit()
+        return {
+            "running_commit": running_commit[:7] if running_commit else None,
+            "remote_commit": remote_commit[:7] if remote_commit else None,
+            "update_available": (
+                running_commit is not None
+                and remote_commit is not None
+                and running_commit != remote_commit
+            ),
+        }
+
+    @app.route("/api/update", methods=["POST"])
+    async def apply_update():
+        """Pull latest code and restart the service."""
+        repo_path = _get_repo_path()
+        try:
+            # Pull latest changes
+            result = subprocess.run(
+                ["git", "pull", "origin", "main"],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                cwd=repo_path,
+            )
+            if result.returncode != 0:
+                return {"success": False, "error": f"Git pull failed: {result.stderr}"}, 500
+
+            # Restart the service (runs in background, won't wait for completion)
+            subprocess.Popen(
+                ["systemctl", "restart", "icemaker"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+            return {"success": True, "message": "Update applied, restarting service..."}
+        except Exception as e:
+            return {"success": False, "error": str(e)}, 500
 
     # Register API blueprints
     from .routes import config, relays, sensors, simulator, state

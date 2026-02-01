@@ -2,9 +2,10 @@
  * Main dashboard component.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useIcemakerState } from '../hooks/useIcemakerState';
 import { useTemperature } from '../contexts/TemperatureContext';
+import { fetchVersion, applyUpdate } from '../api/client';
 import { MainPanel } from './MainPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { TemperatureChart } from './TemperatureChart';
@@ -22,6 +23,35 @@ export function Dashboard() {
   } = useIcemakerState();
   const { unit, toggleUnit } = useTemperature();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // Check for updates on mount and every 60 seconds
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const version = await fetchVersion();
+        setUpdateAvailable(version.update_available);
+      } catch {
+        // Ignore errors - update check is not critical
+      }
+    };
+
+    checkForUpdates();
+    const interval = setInterval(checkForUpdates, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleUpdate = async () => {
+    if (isUpdating) return;
+    setIsUpdating(true);
+    try {
+      await applyUpdate();
+      // Service will restart, page will lose connection
+    } catch {
+      setIsUpdating(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -36,6 +66,16 @@ export function Dashboard() {
     <div className="dashboard">
       <header className="dashboard-header">
         <h1>Icemaker</h1>
+        {updateAvailable && (
+          <button
+            className="update-notice"
+            onClick={handleUpdate}
+            disabled={isUpdating}
+            title="Click to pull updates and restart server"
+          >
+            {isUpdating ? 'Updating...' : 'Update available'}
+          </button>
+        )}
         <div className="header-actions">
           <button
             className="header-btn"
